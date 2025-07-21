@@ -1,0 +1,9 @@
+const mongoose = require('mongoose');
+
+const learningAreaSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  grade: { type: String, enum: ['PP 1', 'PP 2', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'] ,required: true },
+
+});
+
+module.exports = mongoose.model('LearningArea', learningAreaSchema);

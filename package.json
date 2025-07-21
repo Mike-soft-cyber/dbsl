@@ -1,0 +1,11 @@
+{
+"scripts": {
+  "dev": "concurrently \"pnpm run backend\" \"pnpm run user-interface\"",
+  "backend": "cd backend && pnpm run dev",
+  "user-interface": "cd user-interface && pnpm run dev"
+}
+,
+	"devDependencies": {
+		"concurrently": "^9.2.0"
+	}
+}
