@@ -13,7 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const docRoutes = require('./routes/documentRoutes')
 const authMiddleware = require('./middleware/auth')
 const teachersRoutes = require('./routes/teacherRoutes')
-const schoolRoutes = require('./routes/schoolROutes')
+const schoolRoutes = require('./routes/schoolRoutes')
 const paymentRoute = require('./routes/paymentRoute')
 const learningAreaRoutes = require('./routes/learningAreaRoutes')
 
