@@ -43,6 +43,7 @@ export default function Signup() {
     localStorage.setItem('teacherId', res.data.user._id)
     localStorage.setItem('userData', JSON.stringify(res.data.user))
     localStorage.setItem('schoolId', user.schoolId);
+    console.log("Signup success:", res.data)
     toast.success("Signup Successful")
     navigate('/dashboard');
   } catch (err) {
