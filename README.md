@@ -79,7 +79,11 @@ The development is structured into five phases:
 ### **Final Deliverable**
 
 - Fully functional DBSL web application generating all document types with integrated M-Pesa payments and final user guide.
-dbsl-liart.vercel.app
 
----
+## 🎥 Demo Video  
+[Watch the demo video](https://dbsl-liart.vercel.app/)
+
+## 🌐 Live Project  
+[Check the deployed project](https://drive.google.com/file/d/1jQKAQeaZIGNO9ZSr42SFowxnycVLN6Rf/view?usp=sharing)
+
 
