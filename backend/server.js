@@ -17,6 +17,11 @@ const schoolRoutes = require('./routes/schoolRoutes')
 const paymentRoute = require('./routes/paymentRoute')
 const learningAreaRoutes = require('./routes/learningAreaRoutes')
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://dbsl-liart.vercel.app'
+];
+
 
 app.use(cors({
     origin: 'http://localhost:5173',
