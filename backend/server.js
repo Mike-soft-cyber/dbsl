@@ -8,11 +8,13 @@ require('dotenv').config();
 const app = express();
 connectDB();
 
+
 // ✅ CORS - MUST BE BEFORE STATIC FILES
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5000',
-  'https://dbsl.onrender.com'
+  'https://dbsl.onrender.com',
+  'https://dbsl-liart.vercel.app'
 ];
 
 app.use(cors({
