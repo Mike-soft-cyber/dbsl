@@ -1,7 +1,9 @@
 const axios = require('axios');
+const axiosRetry = require('axios-retry').default;
 const dotenv = require('dotenv');
 dotenv.config();
 
+// Env variables
 const {
   MPESA_CONSUMER_KEY,
   MPESA_CONSUMER_SECRET,
@@ -11,59 +13,132 @@ const {
   CALLBACK_URL,
 } = process.env;
 
-const auth = Buffer.from(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`).toString('base64');
+const mpesaAxios = axios.create({ baseURL: MPESA_BASE_URL });
 
-// Get OAuth token
-async function getMpesaToken() {
-  const url = `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`;
+axiosRetry(mpesaAxios, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return error.response?.status >= 500 || error.code === 'ECONNABORTED';
+  },
+});
 
-  const res = await axios.get(url, {
-    headers: {
-      Authorization: `Basic ${auth}`,
-    },
-  });
+// Cached token store
+let cachedToken = null;
+let tokenExpiry = null;
 
-  return res.data.access_token;
-}
+// ✅ Get and cache access token
+const getAccessToken = async () => {
+  if (cachedToken && tokenExpiry > Date.now()) {
+    return cachedToken;
+  }
 
-// Initiate STK Push
-async function stkPush(phone, amount, accountRef, transactionDesc) {
-  const token = await getMpesaToken();
+  const auth = Buffer.from(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`).toString('base64');
 
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[^0-9]/g, '')
-    .slice(0, -3);
+  try {
+    const response = await axios.get(
+      `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+      {
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      }
+    );
 
-  const password = Buffer.from(
-    `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`
-  ).toString('base64');
+    cachedToken = response.data.access_token;
+    tokenExpiry = Date.now() + (response.data.expires_in - 60) * 1000; // cache ~59 mins
+
+    console.log("✅ Token fetched successfully");
+    return cachedToken;
+  } catch (error) {
+    console.error("❌ Failed to fetch access token:", error.response?.data || error.message);
+    throw new Error("MPESA token error");
+  }
+};
+
+// ✅ Initiate STK Push
+const stkPush = async (
+  phoneNumber,
+  amount,
+  accountReference = "DocumentPayment",
+  transactionDesc = "Payment for document"
+) => {
+  const accessToken = await getAccessToken();
+
+  const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(0, 14);
+  const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString("base64");
 
   const payload = {
     BusinessShortCode: MPESA_SHORTCODE,
     Password: password,
     Timestamp: timestamp,
-    TransactionType: 'CustomerPayBillOnline',
+    TransactionType: "CustomerPayBillOnline",
     Amount: amount,
-    PartyA: phone.startsWith('254') ? phone : phone.replace(/^0/, '254'),
+    PartyA: phoneNumber,
     PartyB: MPESA_SHORTCODE,
-    PhoneNumber: phone.startsWith('254') ? phone : phone.replace(/^0/, '254'),
+    PhoneNumber: phoneNumber,
     CallBackURL: CALLBACK_URL,
-    AccountReference: accountRef,
+    AccountReference: accountReference,
     TransactionDesc: transactionDesc,
   };
 
-  const res = await axios.post(
-    `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
-    payload,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  try {
+    console.log("📤 STK Push Payload:", payload);
 
-  return res.data;
-}
+    const response = await axios.post(
+      `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
 
-module.exports = { getMpesaToken, stkPush };
+    console.log("Using MPESA_BASE_URL:", MPESA_BASE_URL);
+    console.log("✅ STK Push initiated:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ STK Push Failed:", error.response?.data || error.message);
+    throw new Error("STK push error");
+  }
+};
+
+// ✅ Query STK Push Status
+const queryStkPushStatus = async (checkoutRequestID) => {
+  const accessToken = await getAccessToken();
+
+  const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(0, 14);
+  const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString('base64');
+
+  const payload = {
+    BusinessShortCode: MPESA_SHORTCODE,
+    Password: password,
+    Timestamp: timestamp,
+    CheckoutRequestID: checkoutRequestID,
+  };
+
+  try {
+    const response = await axios.post(
+      `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    console.log("📥 STK Query Result:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ STK Query Failed:", error.response?.data || error.message);
+    throw new Error("STK query error");
+  }
+};
+
+module.exports = {
+  getAccessToken,
+  stkPush,
+  queryStkPushStatus,
+};

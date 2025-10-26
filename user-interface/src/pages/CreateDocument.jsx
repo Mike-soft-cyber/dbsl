@@ -1,12 +1,14 @@
 import { React, useState, useEffect } from "react";
-import { School, Users, Calendar, BookOpen, GraduationCap, Clock, FileText, MoveLeft, User } from "lucide-react";
+import { School, Users, Calendar, BookOpen, GraduationCap, Clock, FileText, MoveLeft, User, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from "@/components/ui/dashboard/NavBar";
 import API from "@/api";
+import { toast } from "sonner";
 
 export default function CreateDocument() {
   const location = useLocation();
@@ -16,26 +18,26 @@ export default function CreateDocument() {
   const [formData, setFormData] = useState({
     type: location.state?.type || '',
     term: "",
-    learningArea: "",
-    learningAreaName: "",
-    grade: "",
+    learningArea: location.state?.learningArea || '',
+    grade: location.state?.grade || '',
+    stream: location.state?.stream || '',
     strand: "",
-    strandName: "",
-    substrands: "",
-    substrandsName: "",
+    substrand: "", // CHANGED: substrands -> substrand (singular)
     school: "",
     teacher: "",
   });
 
-  const [strandsOption, setStrandsOption] = useState([]);
-  const [substrandsOption, setSubStrandsOption] = useState([]);
+  const [cbcEntries, setCbcEntries] = useState([]);
+  const [filteredLearningAreas, setFilteredLearningAreas] = useState([]);
+  const [filteredStrands, setFilteredStrands] = useState([]);
+  const [filteredSubstrands, setFilteredSubstrands] = useState([]);
   const [document, setDocument] = useState([]);
   const [teacher, setTeacher] = useState(null);
   const [term, setTerm] = useState([]);
-  const [learningArea, setLearningArea] = useState([]);
   const [grade, setGrade] = useState([]);
+  const [filteredStreams, setFilteredStreams] = useState([]);
   const [schoolName, setSchoolName] = useState(null);
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false);
 
   // Handle input changes
   const handleChange = (field, value) => {
@@ -84,9 +86,9 @@ export default function CreateDocument() {
         setSchoolName(res.data.schoolName);
 
         setFormData((prev) => ({
-        ...prev,
-        school: res.data.schoolName,
-      }));
+          ...prev,
+          school: res.data.schoolName,
+        }));
       } catch (err) {
         console.error("Error fetching teacher school:", err);
       }
@@ -108,271 +110,357 @@ export default function CreateDocument() {
       .catch((err) => console.error(err));
   }, []);
 
-  // Fetch learning areas based on grade
   useEffect(() => {
-    const fetchLearningAreas = async () => {
+    API.get('/cbc')
+      .then((res) => setCbcEntries(res.data))
+      .catch((err) => console.error(err));
+  }, []);
+
+  // fetch stream 
+  useEffect(() => {
+    const fetchStreams = async () => {
       try {
-        const res = await API.get(`/learningareas/grade/${formData.grade}`);
-        setLearningArea(res.data);
+        const res = await API.get(`/documents/streams/${userData._id}`);
+        setFilteredStreams(res.data);
       } catch (err) {
         console.error(err);
       }
     };
-    if (formData.grade) fetchLearningAreas();
-  }, [formData.grade]);
+    fetchStreams();
+  }, []);
 
-  // Fetch strands when grade and learning area are selected
   useEffect(() => {
-    const fetchStrands = async () => {
-      try {
-        const res = await API.get(`/strands/${formData.grade}/${formData.learningArea}`);
-        setStrandsOption(res.data);
-      } catch (err) {
-        console.error(err);
+    if (formData.grade) {
+      const learningAreas = [
+        ...new Set(
+          cbcEntries
+            .filter(entry => entry.grade === formData.grade)
+            .map(entry => entry.learningArea)
+        ),
+      ];
+      setFilteredLearningAreas(learningAreas);
+      handleChange("learningArea", "");
+      handleChange("strand", "");
+      handleChange("substrand", ""); // CHANGED: substrands -> substrand
+    }
+  }, [formData.grade, cbcEntries]);
+
+  //fetching strands
+  useEffect(() => {
+    if (formData.grade && formData.learningArea) {
+      const strands = [
+        ...new Set(
+          cbcEntries
+            .filter(entry =>
+              entry.grade === formData.grade &&
+              entry.learningArea === formData.learningArea
+            )
+            .map(entry => entry.strand)
+        ),
+      ];
+      setFilteredStrands(strands);
+      handleChange("strand", "");
+      handleChange("substrand", ""); // CHANGED: substrands -> substrand
+    }
+  }, [formData.learningArea, formData.grade, cbcEntries]);
+
+  //fetching substrands from grade, strands and learning area
+  useEffect(() => {
+    if (formData.grade && formData.learningArea && formData.strand) {
+      const matchingEntries = cbcEntries.filter(
+        (entry) =>
+          entry.grade === formData.grade &&
+          entry.learningArea === formData.learningArea &&
+          entry.strand === formData.strand
+      );
+
+      const substrands = [...new Set(matchingEntries.map(entry => entry.substrand))];
+
+      setFilteredSubstrands(substrands);
+
+      if (!substrands.includes(formData.substrand)) { // CHANGED: substrands -> substrand
+        setFormData((prev) => ({ ...prev, substrand: "" })); // CHANGED: substrands -> substrand
       }
-    };
-    if (formData.grade && formData.learningArea) fetchStrands();
-  }, [formData.grade, formData.learningArea]);
+    }
+  }, [formData.grade, formData.learningArea, formData.strand, cbcEntries]);
 
-  // Fetch substrands when strand changes
   useEffect(() => {
-    const fetchSubstrands = async () => {
-      try {
-        const res = await API.get(`/substrands/${formData.strand}`);
-        setSubStrandsOption(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    if (formData.strand) fetchSubstrands();
-  }, [formData.strand]);
-
-  // Reset learning area, strand, and substrand when grade changes
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      learningArea: '',
-      strand: '',
-      substrands: ''
-    }));
-  }, [formData.grade]);
-
-  // Reset strand and substrand when learning area changes
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      strand: '',
-      substrands: ''
-    }));
-  }, [formData.learningArea]);
+    if (location.state) {
+      setFormData(prev => ({
+        ...prev,
+        grade: location.state.grade || '',
+        stream: location.state.stream || '',
+        learningArea: location.state.learningArea || '',
+      }));
+    }
+  }, [location.state]);
 
   const handleSubmit = (e) => {
-  e.preventDefault();
-  setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
-  const requiredFields = ['type', 'term', 'learningArea', 'grade', 'strand', 'substrands', 'teacher', 'school'];
-  for (let field of requiredFields) {
-    if (!formData[field]) {
-      alert(`Please select or fill the ${field}`);
-      return;
+    const requiredFields = [
+      'type',
+      'term',
+      'learningArea',
+      'grade',
+      'stream',
+      'strand',
+      'substrand', // CHANGED: substrands -> substrand
+      'teacher',
+      'school'
+    ];
+
+    for (let field of requiredFields) {
+      if (!formData[field]) {
+        toast.error(`Please select or fill the ${field}`);
+        setLoading(false);
+        return;
+      }
     }
-  }
-  navigate('/checkout', { state: formData });
-};
 
+    console.log("📤 Form data being sent to checkout:", formData); // Debug log
+
+    navigate("/checkout", {
+      state: {
+        ...formData,
+        teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}` : "",
+      },
+    });
+  };
 
   const handleBack = () => {
-    navigate('/dashboard');
+    if (userData?.role === 'Admin') {
+      navigate('/adminPages');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (
-    <div className="bg-teal-500 min-h-screen">
-      <Navbar userData={userData} />
-
-      <div className="flex flex-column gap-100 item-center">
-        <Button onClick={handleBack} className="bg-pink-50 hover:bg-teal-600 hover:text-white m-3">
-          <MoveLeft />
-        </Button>
-        <div className="flex-row">
-          <h1 className="font-bold text-2xl">Create Document</h1>
-          <p>Generate CBC-aligned educational documents</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Sticky Navbar */}
+      <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
+        <Navbar userData={userData} />
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="mx-50 bg-pink-50 text-teal-900">
-          <CardHeader>
-            <CardTitle>
-              <h1 className="flex flex-column gap-2 items-center text-2xl">
-                <FileText /> Document Generation Form
+      {/* Main Content with padding-top to account for sticky navbar */}
+      <div className="p-4 md:p-8 pt-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center gap-4 mb-8">
+            <Button
+              onClick={handleBack}
+              className="bg-white text-gray-700 border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-all hover:bg-gray-50"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="bg-white p-6 rounded-2xl shadow-lg flex-1 border border-gray-100">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Create Document
               </h1>
-            </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-column justify-between gap-3">
-                <Input
-                  type="text"
-                  value={schoolName || ""}
-                  readOnly
-                  placeholder="School Name"
-                />
-                <Input
-                  type="text"
-                  value={teacher ? `${teacher.firstName} ${teacher.lastName}` : ""}
-                  readOnly
-                  placeholder="Teacher Name"
-                />
-              </div>
+              <p className="text-gray-600 mt-2">
+                Generate CBC-aligned educational documents with AI
+              </p>
+            </div>
+          </div>
 
-              <div className="flex flex-column gap-5 mt-5">
-                {/* Term selection */}
-                <label htmlFor="term" className="flex-row">Term
-                  <Select
-                  value= {formData.term}
-                  onValueChange={(value) => handleChange("term", value)}
-                  >
-                    <SelectTrigger className="w-70">
-                      <SelectValue placeholder="Select term" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-pink-50">
-                      {Array.isArray(term) && term.map((t) => (
-                        <SelectItem key={t} value={t} className="hover:bg-teal-600 hover:text-white">
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
+          <form onSubmit={handleSubmit}>
+            <Card className="p-6 md:p-8 w-full bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-2xl">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-xl md:text-2xl font-semibold text-gray-800 flex items-center gap-3">
+                  <FileText className="text-blue-600 w-6 h-6" />
+                  Document Generation Form
+                </CardTitle>
+              </CardHeader>
 
-                {/* Grade selection */}
-                <label htmlFor="grade" className="flex-row">Grade
-                  <Select
-                  value= {formData.grade}
-                   onValueChange={(value) => handleChange("grade", value)}
-                   >
-                    <SelectTrigger className="w-70">
-                      <SelectValue placeholder="Select grade" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-pink-50">
-                      {Array.isArray(grade) && grade.map((g) => (
-                        <SelectItem key={g} value={g} className="hover:bg-teal-600 hover:text-white">
-                          {g}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                {/* Learning Area selection */}
-                <label htmlFor="learningArea" className="flex-row">Learning Area
-                  <Select
-                  value= {formData.learningArea}
-                  onValueChange={(value) => {
-                    handleChange("learningArea", value)
-                    const selected = learningArea.find((l) => l._id === value);
-                    if (selected) {
-                      handleChange("learningAreaName", selected.name); // store name for UI
-                      }
-                  }}
-                  >
-                    <SelectTrigger className="w-70">
-                      <SelectValue placeholder="Select Learning Area" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-pink-50">
-                      {Array.isArray(learningArea) && learningArea.map((l) => (
-                        <SelectItem key={l._id} value={l._id} className="hover:bg-teal-600 hover:text-white">
-                          {l.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
+              <CardContent className="space-y-6">
+                {/* School and Teacher Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">School Name</Label>
+                    <Input
+                      readOnly
+                      value={schoolName || ""}
+                      className="bg-gray-50 border border-gray-200 rounded-xl py-5 font-medium"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Teacher Name</Label>
+                    <Input
+                      readOnly
+                      value={teacher ? `${teacher.firstName} ${teacher.lastName}` : ""}
+                      className="bg-gray-50 border border-gray-200 rounded-xl py-5 font-medium"
+                    />
+                  </div>
                 </div>
 
-                <div className="flex flex-column gap-5 mt-5">
-                {/* Strands selection */}
-                <label htmlFor="strands" className="flex-row gap-5">Strands
-  <Select
-    value={formData.strand}
-    onValueChange={(value) => {
-      handleChange("strand", value);
-      const selected = strandsOption.find((s) => s._id === value);
-      if (selected) handleChange("strandName", selected.strand); // use `.strand` not `.name`
-    }}
-  >
-    <SelectTrigger className="w-100">
-      <SelectValue placeholder="Select Strand" />
-    </SelectTrigger>
-    <SelectContent className="bg-pink-50">
-      {Array.isArray(strandsOption) && strandsOption.map((s) => (
-        <SelectItem
-          key={s._id}
-          value={s._id}
-          className="hover:bg-teal-600 hover:text-white"
-        >
-          {s.strand}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</label>
+                {/* Term and Stream */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Term</Label>
+                    <Select
+                      value={formData.term}
+                      onValueChange={(value) => handleChange("term", value)}
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select Term" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {Array.isArray(term) && term.map((t) => (
+                          <SelectItem key={t} value={t} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-
-                {/* Substrands selection */}
-                <label htmlFor="substrands" className="flex-row gap-5">Substrands
-  <Select
-    value={formData.substrands}
-    onValueChange={(value) => {
-      handleChange("substrands", value);
-      const selected = substrandsOption.find((ss) => ss._id === value);
-      if (selected) handleChange("substrandsName", selected.name);
-    }}
-  >
-    <SelectTrigger className="w-100">
-      <SelectValue placeholder="Select Substrand" />
-    </SelectTrigger>
-    <SelectContent className="bg-pink-50">
-      {Array.isArray(substrandsOption) && substrandsOption.map((sub) => (
-        <SelectItem
-          key={sub._id}
-          value={sub._id}
-          className="hover:bg-teal-600 hover:text-white"
-        >
-          {sub.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</label>
-
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Stream</Label>
+                    <Select
+                      value={formData.stream}
+                      onValueChange={(value) => handleChange("stream", value)}
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select Stream" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {filteredStreams.map((s, idx) => (
+                          <SelectItem key={idx} value={s} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-              {/* Document type selection */}
-              <div className="mt-5">
-                <label htmlFor="document">Document Type</label>
-                <Select
-                  onValueChange={(value) => handleChange("type", value)}
-                  value={formData.type}
+                {/* Grade and Learning Area */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Grade</Label>
+                    <Select
+                      value={formData.grade}
+                      onValueChange={(value) => handleChange("grade", value)}
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select grade" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {Array.isArray(grade) && grade.map((g) => (
+                          <SelectItem key={g} value={g} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {g}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Learning Area</Label>
+                    <Select
+                      value={formData.learningArea}
+                      onValueChange={(value) => handleChange("learningArea", value)}
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select Learning Area" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {filteredLearningAreas.map((la, idx) => (
+                          <SelectItem key={idx} value={la} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {la}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Strand and Substrand */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Strand</Label>
+                    <Select
+                      value={formData.strand}
+                      onValueChange={(value) => handleChange("strand", value)}
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select Strand" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {filteredStrands.map((s, idx) => (
+                          <SelectItem key={idx} value={s} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">Substrand</Label>
+                    <Select
+                      value={formData.substrand} // CHANGED: substrands -> substrand
+                      onValueChange={(value) => handleChange("substrand", value)} // CHANGED: substrands -> substrand
+                    >
+                      <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                        <SelectValue placeholder="Select Substrand" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                        {filteredSubstrands.map((ss, index) => (
+                          <SelectItem key={index} value={ss} className="py-3 hover:bg-blue-50 rounded-lg">
+                            {ss}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Document Type */}
+                <div className="space-y-2">
+                  <Label className="font-semibold text-gray-700">Document Type</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => handleChange("type", value)}
+                  >
+                    <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                      <SelectValue placeholder="Select document type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                      {Array.isArray(document) && document.map((doc) => (
+                        <SelectItem key={doc} value={doc} className="py-3 hover:bg-blue-50 rounded-lg">
+                          {doc}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-5 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:transform-none disabled:cursor-not-allowed mt-6"
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select document type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-pink-50">
-                    {Array.isArray(document) && document.map((doc) => (
-                      <SelectItem key={doc} value={doc} className="hover:bg-teal-600 hover:text-white">
-                        {doc}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button type="submit" disabled={loading} className="w-full mt-10 bg-teal-600 text-white cursor-pointer hover:bg-teal-800">
-                <FileText /> {loading ? "Generating..." : "Generate Document"}
-              </Button>
-            </CardContent>
-        </Card>
-      </form>
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Preparing...
+                    </div>
+                  ) : (
+                    <>
+                      <FileText className="w-5 h-5 mr-2" />
+                      Generate Document
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

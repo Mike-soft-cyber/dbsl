@@ -1,13 +1,12 @@
-import { useState} from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { User, Lock, Mail, Phone, School, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Mail, Phone, School, Eye, EyeOff, BookOpen } from 'lucide-react';
 import API from '../api';
-
 
 export default function Signup() {
     const [formData, setFormData] = useState({
@@ -19,10 +18,11 @@ export default function Signup() {
         schoolCode: '',
         email: '',
         password: '',
+        confirmPassword: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate();
 
@@ -31,148 +31,216 @@ export default function Signup() {
         setFormData({ ...formData, [name]: value });
     };
 
-  const handleSubmit = async (e) => {
-    setLoading(true)
-  e.preventDefault();
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Password confirmation check
+        if (formData.password !== formData.confirmPassword) {
+            toast.error("Passwords do not match");
+            return;
+        }
 
-  console.log("Sending signup payload:", formData);
+        setLoading(true);
 
-  try {
-    const res = await API.post('/user/register', formData);
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('teacherId', res.data.user._id)
-    localStorage.setItem('userData', JSON.stringify(res.data.user))
-    localStorage.setItem('schoolId', user.schoolId);
-    console.log("Signup success:", res.data)
-    toast.success("Signup Successful")
-    navigate('/dashboard');
-  } catch (err) {
-    console.error("Signup error:", err.response ? err.response.data : err.message);
-    toast.error("SIgnup Failed: ", err.response ? err.response.data : err.message)
-    setLoading(false)
-  }
-};
+        try {
+            // Fixed: Changed from '/user/register' to '/user/register' 
+            // This matches your backend route: router.post('/register', user.signup);
+            const res = await API.post('/user/register', formData);
+            
+            // The backend returns a message and user info but NO token initially
+            // since email verification is required
+            const { user, message } = res.data;
 
-    const togglePasword = () => {
-        setFormData((prev) => ({
-            ...prev,
-            password: prev.password ? '' : prev.password,
-        }));
+            toast.success(message || "Account created! Please check your email to verify your account.");
+            
+            // Don't store token or redirect immediately - user needs to verify email first
+            // Just redirect to login page or show verification message
+            navigate('/login');
+            
+        } catch (err) {
+            console.error("Signup error:", err.response ? err.response.data : err.message);
+            toast.error("Signup Failed: " + (err.response?.data?.message || err.message));
+        } finally {
+            setLoading(false);
+        }
     };
+
     return (
-        <div className="min-h-screen flex items-center justify-center bg-teal-900">
-            <Toaster richColors position="top-center" />
-              <Card className="w-96 bg-white shadow-lg ">
-            <CardHeader>
-                <CardTitle className="text-center">Signup</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="firstName"
-                            placeholder="First Name"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+            <div className="absolute top-10 left-10 w-20 h-20 bg-blue-200/30 rounded-full blur-xl"></div>
+            <div className="absolute bottom-10 right-10 w-24 h-24 bg-purple-200/30 rounded-full blur-xl"></div>
+            
+            <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 w-full"></div>
+                
+                <CardHeader className="text-center pb-6">
+                    <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <BookOpen className="text-white w-8 h-8" />
                     </div>
-                    <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="lastName"
-                            placeholder="Last Name"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                    </div>
-                    <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="phone"
-                            placeholder="Phone"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                    </div>
-                    <Select onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                        <SelectTrigger className="w-full cursor-pointer bg-gray-50 border border-gray-300 rounded-md">
-                            <SelectValue placeholder="Select Role" />
-                        </SelectTrigger>
-                        <SelectContent className={"bg-white"}>
-                            <SelectItem value="Director" className={"hover:bg-teal-500 hover:text-white"}>Director</SelectItem>
-                            <SelectItem value="Principal" className={"hover:bg-teal-500 hover:text-white"}>Principal</SelectItem>
-                            <SelectItem value="Deputy Principal" className={"hover:bg-teal-500 hover:text-white"}>Deputy Principal</SelectItem>
-                            <SelectItem value="Dean of Studies" className={"hover:bg-teal-500 hover:text-white"}>Dean of Studies</SelectItem>
-                            <SelectItem value="Teacher" className={"hover:bg-teal-500 hover:text-white"}>Teacher</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <div className="relative">
-                        <School className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="schoolName"
-                            placeholder="School Name"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                    </div>
-                    <div className="relative">
-                        <School className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="schoolCode"
-                            placeholder="School Code"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                    </div>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="email"
-                            placeholder="Email"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                    </div>
-                    <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Set Password"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                        {showPassword ? (
-                            <Eye className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer" onClick={() => setShowPassword(false)} />
-                        ) : (
-                            <EyeOff className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer" onClick={() => setShowPassword(true)} />
-                        )}
-                    </div>
-                    <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            name="confirmPassword"
-                            type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Confirm Password"
-                            onChange={handleChange}
-                            className="pl-10 bg-gray-50 border border-gray-300 rounded-md"
-                        />
-                        {showConfirmPassword ? (
-                            <Eye className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer" onClick={() => setShowConfirmPassword(false)} />
-                        ) : (
-                            <EyeOff className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer" onClick={() => setShowConfirmPassword(true)} />
-                        )}
-                    </div>
-                    <Button type="submit" disabled={loading} className="w-full bg-teal-600 text-white hover:bg-teal-700 cursor-pointer">
-                        {loading ? 'Signing up ...' : 'Signup'}
+                    <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Create Account
+                    </CardTitle>
+                    <p className="text-gray-600 text-sm mt-2">Join thousands of educators using DBSL</p>
+                </CardHeader>
+                
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Name Fields */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                                <Input 
+                                    name="firstName"
+                                    placeholder="First name"
+                                    onChange={handleChange}
+                                    className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                    required
+                                />
+                            </div>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                                <Input 
+                                    name="lastName"
+                                    placeholder="Last name"
+                                    onChange={handleChange}
+                                    className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone */}
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="phone"
+                                placeholder="Phone number"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                        </div>
+
+                        {/* Role Select */}
+                        <Select onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                            <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                                <SelectValue placeholder="Select your role" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                                <SelectItem value="Admin" className="cursor-pointer hover:bg-blue-50 rounded-lg py-3">
+                                    Administrator
+                                </SelectItem>
+                                <SelectItem value="Teacher" className="cursor-pointer hover:bg-blue-50 rounded-lg py-3">
+                                    Teacher
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* School Info */}
+                        <div className="relative">
+                            <School className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="schoolName"
+                                placeholder="School name"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                        </div>
+
+                        <div className="relative">
+                            <School className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="schoolCode"
+                                placeholder="School code"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                        </div>
+
+                        {/* Email */}
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="email"
+                                type="email"
+                                placeholder="Email address"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                        </div>
+
+                        {/* Password */}
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Create password"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
+                                {showPassword ? (
+                                    <EyeOff className="text-gray-400 hover:text-gray-600 transition-colors" />
+                                ) : (
+                                    <Eye className="text-gray-400 hover:text-gray-600 transition-colors" />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                            <Input 
+                                name="confirmPassword"
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Confirm password"
+                                onChange={handleChange}
+                                className="pl-10 bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                required
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                {showConfirmPassword ? (
+                                    <EyeOff className="text-gray-400 hover:text-gray-600 transition-colors" />
+                                ) : (
+                                    <Eye className="text-gray-400 hover:text-gray-600 transition-colors" />
+                                )}
+                            </div>
+                        </div>
+
+                        <Button 
+                            type="submit" 
+                            disabled={loading} 
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-5 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:transform-none disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <div className="flex items-center justify-center">
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                                    Creating account...
+                                </div>
+                            ) : (
+                                'Create Account'
+                            )}
                         </Button>
-                </form>
-            </CardContent>
-            <CardFooter className="text-center">
-                <p>Already have an account? <a href="/login" className={"text-teal-600 hover:text-teal-700 font-bold"}>Login</a></p>
-            </CardFooter>
-        </Card>
+                    </form>
+                </CardContent>
+                
+                <CardFooter className="text-center pt-4 pb-6">
+                    <p className="text-gray-600">
+                        Already have an account?{' '}
+                        <a 
+                            href="/login" 
+                            className="font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:from-blue-700 hover:to-purple-700 transition-all"
+                        >
+                            Sign in here
+                        </a>
+                    </p>
+                </CardFooter>
+            </Card>
         </div>
     );
 }

@@ -1,11 +1,16 @@
 {
-"scripts": {
-  "dev": "concurrently \"pnpm run backend\" \"pnpm run user-interface\"",
-  "backend": "cd backend && pnpm run dev",
-  "user-interface": "cd user-interface && pnpm run dev"
-}
-,
+	"scripts": {
+		"dev": "concurrently \"pnpm run backend\" \"pnpm run user-interface\"",
+		"backend": "cd backend && pnpm run dev",
+		"user-interface": "cd user-interface && pnpm run dev",
+		"extract-cbc": "node backend/models/extractCBC.js"
+	},
 	"devDependencies": {
 		"concurrently": "^9.2.0"
+	},
+	"dependencies": {
+		"mongoose": "^8.17.2",
+		"pdf-parse": "^1.1.1",
+		"react-markdown": "^10.1.0"
 	}
 }

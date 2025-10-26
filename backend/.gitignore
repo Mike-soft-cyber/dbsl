@@ -1,0 +1,7 @@
+# Uploaded images
+uploads/diagrams/*
+!uploads/diagrams/.gitkeep
+
+# Temporary PDF files
+temp/*
+!temp/.gitkeep

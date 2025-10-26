@@ -4,12 +4,21 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Index from './pages/Index';
 import DashBoard from './pages/DashBoard';
+import AdminDashBoard from './pages/AdminDashBoard'
 import CreateDocument from './pages/CreateDocument';
 import ProtectedRoute from './lib/ProtectedRoute';
 import Checkout from './pages/Checkout';
 import { Toaster } from "sonner";
-
-
+import CbcDataDash from './pages/CbcDataDash';
+import PaymentDashboard from './pages/PaymentDashboard';
+import DocDashboard from './pages/DocDashboard';
+import AdminSettings from './pages/AdminSettings';
+import AdminTeachers from './pages/AdminTeachers';
+import AdminDash from './pages/AdminDashBoard';
+import AdminPages from './pages/AdminPages';
+import DocumentPage from './pages/DocumentPage';
+import VerifyEmail from './pages/VerifyEmail';
+import MyDocumentsPage from './pages/MyDocuments';
 
 function App(){
     return (
@@ -19,25 +28,44 @@ function App(){
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/createDocument" element={<CreateDocument />} />
                 <Route path="/dashboard" element={<DashBoard />} />
                 <Route path="/checkout" element={<Checkout />} />
+                <Route path="/documents/:id" element={<DocumentPage />} />
+                <Route path="/my-documents" element={<MyDocumentsPage />} />
+                <Route path="/profile" element={<AdminSettings />} />
+                <Route path="/adminPages" element={<AdminPages />}>
+                {/* ✅ This makes AdminDash load by default on /adminPages */}
+                <Route index element={<AdminDash />} />
+                
+                <Route path="cbcdata" element={<CbcDataDash />} />
+                <Route path="payment" element={<PaymentDashboard />} />
+                <Route path="docDashboard" element={<DocDashboard />} />
+                <Route path="adminSettings" element={<AdminSettings />} />
+                <Route path="adminTeachers" element={<AdminTeachers />} />
+                <Route path="adminDash" element={<AdminDash />} />
+                </Route>
+
+
                 <Route
-                    path="/dashboard"
-                    element={
-                        <ProtectedRoute>
-                            
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/admin-dashboard"
-                    element={
-                        <ProtectedRoute>
-                            <div>Admin Dashboard</div>
-                        </ProtectedRoute>
-                    }
-                />
+  path="/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={["Teacher"]}>
+      <DashBoard />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/admin-dashboard"
+  element={
+    <ProtectedRoute allowedRoles={["Administrator"]}>
+      <AdminDashBoard />
+    </ProtectedRoute>
+  }
+/>
+
             </Routes>
         </BrowserRouter>
     );
