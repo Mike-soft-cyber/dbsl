@@ -257,5 +257,8 @@ app.listen(PORT, () => {
   console.log(`✅ Test image: http://localhost:${PORT}/api/test-image`);
   console.log(`✅ Debug: http://localhost:${PORT}/api/debug/diagrams`);
   console.log(`✅ CORS enabled for: ${allowedOrigins.join(', ')}`);
+  console.log(`🌐 BACKEND_URL: ${process.env.BACKEND_URL || 'NOT SET'}`);
+  console.log(`📍 NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
+  
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });
