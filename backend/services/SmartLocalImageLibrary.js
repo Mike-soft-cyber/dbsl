@@ -12,9 +12,13 @@ class SmartLocalImageLibrary {
     // ✅ FIX: Use HTTP URLs instead of base64
      this.baseURL = process.env.BACKEND_URL || 
                  process.env.BASE_URL || 
-                 'https://dbsl.onrender.com' ||
-                  'http://localhost:5000';
-  }
+                 (process.env.NODE_ENV === 'production' 
+                   ? 'https://dbsl.onrender.com' 
+                   : 'http://localhost:5000');
+  
+  console.log('[SmartImageLibrary] 🌐 Base URL:', this.baseURL);
+  console.log('[SmartImageLibrary] 📍 Environment:', process.env.NODE_ENV);
+}
 
   /**
  * ✅ MAIN FUNCTION: Auto-detect and match images by filename similarity - FIXED VERSION
