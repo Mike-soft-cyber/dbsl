@@ -13,15 +13,16 @@ class DiagramService {
    */
   static async processInlineDiagrams(aiContent, contextData) {
     const {
-      grade,
-      learningArea,
-      strand,
-      substrand,
-      documentId,
-      learningConcepts = [],
-      maxDiagrams = 5,
-      cbcEntry
-    } = contextData;
+    grade,
+    learningArea,
+    strand,
+    substrand,
+    documentId,
+    learningConcepts = [],
+    maxDiagrams = 5,
+    cbcEntry,
+    baseURL  // ✅ Accept base URL
+  } = contextData;
 
     this.log('[DiagramService] 🖼️ Starting AUTO-DETECTION image processing (HTTP URLs)');
     this.log(`[DiagramService] Grade: ${grade}, Subject: ${learningArea}`);
@@ -61,11 +62,15 @@ class DiagramService {
     const conceptsToProcess = learningConcepts.slice(0, Math.min(maxDiagrams, placeholders.length));
     this.log(`[DiagramService] 📚 Auto-detecting images for ${conceptsToProcess.length} concepts`);
 
-    const imageResults = await this.imageLibrary.findImagesForConcepts(
-      conceptsToProcess,
-      learningArea,
-      grade
-    );
+    if (baseURL) {
+    this.imageLibrary.baseURL = baseURL;
+  }
+
+  const imageResults = await this.imageLibrary.findImagesForConcepts(
+    conceptsToProcess,
+    learningArea,
+    grade
+  );
 
     // Replace placeholders with matched images or remove them
     let processedContent = aiContent;

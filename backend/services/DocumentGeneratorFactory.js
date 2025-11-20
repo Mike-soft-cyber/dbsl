@@ -69,17 +69,18 @@ class DocumentGeneratorFactory {
           console.log('[DocumentGen] 🖼️ Processing diagrams with LOCAL IMAGE LIBRARY...');
           
           const diagramResult = await DiagramService.processInlineDiagrams(
-            processedContent,
-            {
-              grade: requestData.grade,
-              learningArea: requestData.learningArea,
-              strand: requestData.strand,
-              substrand: requestData.substrand,
-              cbcEntry: cbcEntry,
-              maxDiagrams: 5,
-              learningConcepts: requestData.learningConcepts || []
-            }
-          );
+  processedContent,
+  {
+    grade: requestData.grade,
+    learningArea: requestData.learningArea,
+    strand: requestData.strand,
+    substrand: requestData.substrand,
+    cbcEntry: cbcEntry,
+    maxDiagrams: 5,
+    learningConcepts: requestData.learningConcepts || [],
+    baseURL: process.env.BACKEND_URL || 'https://dbsl.onrender.com'  // ✅ Pass explicitly
+  }
+);
           
           if (diagramResult && diagramResult.content) {
             finalContent = diagramResult.content;
