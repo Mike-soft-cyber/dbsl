@@ -11,4 +11,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
-});
+
+  // ✅ Base should be '/' for root deployment
+  base: '/',
+  
+  // ✅ Build output
+  build: {
+    outDir: 'dist',
+    sourcemap: false
+  }
+})
