@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, ExternalLink } from 'lucide-react';
 import ContentParser from '../parsing/contentParser';
 import TableView from './TableView';
 import MarkdownView from './MarkdownView';
@@ -57,6 +57,11 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
     return formatted;
   }, [body, documentType, cbcEntry]);
 
+  // ✅ Check if content has web references
+  const hasWebReferences = useMemo(() => {
+    return content && content.includes('📊 Visual Learning Resources');
+  }, [content]);
+
   // If table parsing succeeded, show the table
   if (parsedContent.type === 'table' && parsedContent.data) {
     return (
@@ -92,6 +97,21 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
                 <span className="text-black">{value}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      
+      {/* ✅ Web References Info Banner */}
+      {hasWebReferences && (
+        <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-r-lg">
+          <div className="flex items-start gap-3">
+            <ExternalLink className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-blue-900 mb-1">Web-Based Visual Resources</h4>
+              <p className="text-sm text-blue-800">
+                This document includes curated links to external educational diagrams and visual resources from reputable sources like KICD, Khan Academy, and educational encyclopedias. Click the links throughout the document to access visual aids.
+              </p>
+            </div>
           </div>
         </div>
       )}

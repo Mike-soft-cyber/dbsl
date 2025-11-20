@@ -364,6 +364,7 @@ Basic assessment questions will be included when the full content is generated.
 
       processed = this.sanitizeContent(processed);
       processed = this.ensureContentStructure(processed);
+      processed = this.cleanImageMarkdownPaths(processed);
 
       console.log(`[${this.type}] Post-processing completed`);
       return processed;
@@ -373,6 +374,19 @@ Basic assessment questions will be included when the full content is generated.
       return content.trim();
     }
   }
+  
+  static cleanImageMarkdownPaths(content) {
+  if (!content) return content;
+  
+  return content.replace(
+    /!\[([^\]]*)\]\(([^)]+)\)/g,
+    (match, alt, path) => {
+      const cleanAlt = alt.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+      const cleanPath = path.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+      return `![${cleanAlt}](${cleanPath})`;
+    }
+  );
+}
 
   sanitizeContent(content) {
     return content

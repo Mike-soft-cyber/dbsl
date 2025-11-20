@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Link2, CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import API from '@/api';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const LinkedDocumentButton = ({ document }) => {
   const [hasLinkedNotes, setHasLinkedNotes] = useState(false);
@@ -49,64 +50,58 @@ const LinkedDocumentButton = ({ document }) => {
   };
 
   const generateLinkedNotes = async () => {
-    if (generating) return;
+  if (generating) return;
 
-    try {
-      setGenerating(true);
-      setError(null);
-      console.log('🚀 Starting lesson notes generation...');
+  try {
+    setGenerating(true);
+    setError(null);
+    console.log('🚀 Starting lesson notes generation from:', document._id);
 
-      const response = await API.post(`/documents/generate-linked-notes/${document._id}`, {
-        regenerate: hasLinkedNotes,
-        teacherName: document.teacherName || 'Teacher'
-      });
+    const response = await API.post(`/documents/generate-linked-notes/${document._id}`, {
+      regenerate: hasLinkedNotes,
+      teacherName: document.teacherName || 'Teacher'
+    });
 
-      console.log('📦 Generation response received:', response.data);
+    console.log('📦 Generation response:', response.data);
 
-      // ✅ FIXED: Handle the new response structure from the backend
-      if (response.data.success) {
-        // Try multiple possible locations for the document ID
-        const newDocumentId = response.data.document?._id || 
-                             response.data.documentId || 
-                             response.data.document?._id ||
-                             response.data._id;
+    if (response.data.success) {
+      const newDocumentId = response.data.document?._id || 
+                           response.data.documentId || 
+                           response.data._id;
 
-        if (newDocumentId) {
-          console.log('✅ Generation successful! Document ID:', newDocumentId);
-          
-          // ✅ Show success message and navigate
-          setTimeout(() => {
-            navigateToDocument(newDocumentId);
-          }, 1000);
-          
-        } else {
-          console.error('❌ No document ID found in response:', response.data);
-          setError('Document generated but could not retrieve ID. Please check your documents list.');
-          setGenerating(false);
-          
-          // Refresh to show new document
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        }
+      if (newDocumentId) {
+        console.log('✅ Generation successful! Document ID:', newDocumentId);
+        
+        // Show success message
+        toast.success('Lesson Notes generated successfully! Redirecting...');
+        
+        // âœ… FIX: Navigate immediately, no timeout
+        window.location.href = `/documents/${newDocumentId}`;
+        
       } else {
-        console.error('❌ Generation reported as not successful:', response.data);
-        setError(response.data.message || 'Generation failed without error details');
-        setGenerating(false);
+        console.error('❌ No document ID in response:', response.data);
+        setError('Document generated but ID not found. Refreshing...');
+        
+        // Refresh to show in list
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       }
-    } catch (err) {
-      console.error('❌ Generation request failed:', err);
-      
-      // ✅ FIXED: Better error message extraction
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.error || 
-                          err.message ||
-                          'Failed to generate Lesson Notes. Please try again.';
-      
-      setError(errorMessage);
-      setGenerating(false);
+    } else {
+      throw new Error(response.data.message || 'Generation failed');
     }
-  };
+  } catch (err) {
+    console.error('❌ Generation failed:', err);
+    const errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error || 
+                        err.message ||
+                        'Failed to generate Lesson Notes';
+    
+    setError(errorMessage);
+    toast.error(errorMessage);
+    setGenerating(false);
+  }
+};
 
   if (!isConceptBreakdown) {
     return null;

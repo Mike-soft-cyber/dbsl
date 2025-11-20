@@ -150,7 +150,10 @@ export const formatLessonNotes = (text) => {
     .replace(/^\s*(\d+)\.\s+/gm, '$1. ')
     .replace(/^(Remember|Note|Important|Warning|Tip|Key [Pp]oint):\s*([^\n]*)/gmi, '> **$1:** $2\n')
     .replace(/^([^?\n]*\?)$/gm, '**Q:** $1\n')
-    .replace(/\b(analyze|analyse|evaluate|compare|contrast|explain|describe|identify|classify|demonstrate)\b/gi, '**$1**')
+    
+    // ✅ CRITICAL FIX: REMOVED the line that adds asterisks to action verbs
+    // .replace(/\b(analyze|analyse|evaluate|compare|contrast|explain|describe|identify|classify|demonstrate)\b/gi, '**$1**')
+    
     .replace(/\n(##)/g, '\n\n$1')
     .replace(/(##[^\n]*)\n(?!\n)/g, '$1\n\n')
     .replace(/\n(###)/g, '\n\n$1')
