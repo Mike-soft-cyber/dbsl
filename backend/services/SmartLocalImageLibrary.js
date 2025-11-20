@@ -10,7 +10,10 @@ class SmartLocalImageLibrary {
     this.imageCache = new Map(); // Format: "grade|subject" => [filenames]
     
     // ✅ FIX: Use HTTP URLs instead of base64
-    this.baseURL = process.env.BASE_URL || 'http://localhost:5000' || 'https://dbsl.onrender.com';
+     this.baseURL = process.env.BACKEND_URL || 
+                 process.env.BASE_URL || 
+                 'https://dbsl.onrender.com' ||
+                  'http://localhost:5000';
   }
 
   /**
