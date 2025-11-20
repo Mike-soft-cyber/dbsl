@@ -24,13 +24,15 @@ export const ProfessionalImageComponent = ({
     }
 
     let finalSrc = src || "";
-    const API_BASE = (
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"
-    ).replace(/\/api.*$/, "");
+    
+    // ✅ FIX: Use Vite environment variable for production
+    const API_BASE = import.meta.env.VITE_BACKEND_URL || 
+                     import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 
+                     'http://localhost:5000';
 
     console.log("[ImageComponent] API_BASE:", API_BASE);
 
-    // ✅ Handle different formats safely
+    // Handle different formats safely
     if (src.startsWith("data:image")) {
       finalSrc = src;
       console.log("[ImageComponent] Type: base64");
@@ -38,7 +40,7 @@ export const ProfessionalImageComponent = ({
       finalSrc = src;
       console.log("[ImageComponent] Type: full URL");
     } else {
-      // ✅ Clean markdown and unsafe characters only for file/relative paths
+      // Clean markdown and unsafe characters only for file/relative paths
       finalSrc = (src || "")
         .replace(/\*\*/g, "")
         .replace(/\*/g, "")
