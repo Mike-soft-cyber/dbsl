@@ -1,60 +1,9 @@
+// pdfController.js - FIXED to use stored diagram data
 const puppeteer = require('puppeteer');
 const mongoose = require('mongoose');
 const fs = require('fs').promises;
 const path = require('path');
 const Document = require('../models/Document');
-const axios = require('axios');
-
-/**
- * Convert diagram URLs to base64 for embedding in PDF
- */
-async function convertImagesToBase64(content, baseUrl) {
-  const imageRegex = /!\[(.*?)\]\((\/api\/diagrams\/[^)]+)\)/g;
-  let match;
-  const replacements = [];
-  
-  while ((match = imageRegex.exec(content)) !== null) {
-    const [fullMatch, alt, imagePath] = match;
-    const imageUrl = `${baseUrl}${imagePath}`;
-    replacements.push({ fullMatch, alt, imageUrl, imagePath });
-  }
-  
-  console.log(`[PDF] Found ${replacements.length} images to convert`);
-  
-  for (const { fullMatch, alt, imageUrl, imagePath } of replacements) {
-    try {
-      console.log(`[PDF] Converting: ${imagePath}`);
-      
-      const response = await axios.get(imageUrl, { 
-        responseType: 'arraybuffer',
-        timeout: 10000,
-        validateStatus: (status) => status < 500
-      });
-      
-      if (response.status === 404) {
-        console.warn(`[PDF] ⚠️ Image not found: ${imagePath}`);
-        content = content.replace(fullMatch, `*[Image: ${alt}]*`);
-        continue;
-      }
-      
-      const base64 = Buffer.from(response.data).toString('base64');
-      let mimeType = response.headers['content-type'] || 'image/png';
-      
-      if (imagePath.endsWith('.svg')) mimeType = 'image/svg+xml';
-      else if (imagePath.endsWith('.png')) mimeType = 'image/png';
-      
-      const base64Image = `data:${mimeType};base64,${base64}`;
-      content = content.replace(fullMatch, `![${alt}](${base64Image})`);
-      
-      console.log(`[PDF] ✅ Converted: ${imagePath}`);
-    } catch (error) {
-      console.error(`[PDF] ❌ Failed: ${imageUrl}`, error.message);
-      content = content.replace(fullMatch, `*[Image: ${alt}]*`);
-    }
-  }
-  
-  return content;
-}
 
 /**
  * Escape HTML special characters
@@ -173,38 +122,31 @@ function convertMarkdownTables(markdown) {
 /**
  * Convert markdown to HTML
  */
-const markdownToHtml = (markdown, baseUrl, documentType) => {
+const markdownToHtml = (markdown) => {
   if (!markdown) return '<p>No content available</p>';
   
   let html = markdown;
   
-  // Handle base64 images first
+  // ✅ Handle images (they should already be base64)
   html = html.replace(/!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, (match, alt, base64Data) => {
     return `
   <div class="image-container">
-    <img src="${base64Data}" alt="${alt}" class="diagram-image" />
-    <p class="image-caption">${alt}</p>
+    <img src="${base64Data}" alt="${escapeHtml(alt)}" class="diagram-image" />
+    <p class="image-caption">${escapeHtml(alt)}</p>
   </div>`;
+  });
+  
+  // ✅ Handle any HTTP URLs (shouldn't exist but just in case)
+  html = html.replace(/!\[(.*?)\]\((https?:\/\/[^)]+)\)/g, (match, alt, url) => {
+    console.warn('[PDF] ⚠️ Found HTTP URL in content (should be base64):', url);
+    return `<p><em>[Image: ${escapeHtml(alt)}]</em></p>`;
   });
   
   // Convert markdown tables
   html = convertMarkdownTables(html);
   
-  // Convert other markdown images
-  html = html.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, url) => {
-    if (url.startsWith('data:image')) return match;
-    if (url.startsWith('/')) url = `${baseUrl}${url}`;
-    
-    return `
-  <div class="image-container">
-    <img src="${url}" alt="${alt}" class="diagram-image" />
-    <p class="image-caption">${alt}</p>
-  </div>`;
-  });
-  
   // Remove diagram placeholders
   html = html.replace(/\[DIAGRAM:[^\]]+\]/g, '');
-  html = html.replace(/\*\[Diagram unavailable\]\*/g, '');
   
   // Convert headings
   html = html.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
@@ -218,32 +160,12 @@ const markdownToHtml = (markdown, baseUrl, documentType) => {
   html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
   html = html.replace(/_(.*?)_/g, '<em>$1</em>');
   
-  // Convert ordered lists
-  let inOrderedList = false;
-  html = html.split('\n').map(line => {
-    if (line.includes('<table>') || line.includes('</table>')) return line;
-    
-    const match = line.match(/^(\d+)\.\s+(.+)$/);
-    if (match) {
-      const item = `<li>${match[2]}</li>`;
-      if (!inOrderedList) {
-        inOrderedList = true;
-        return '<ol>' + item;
-      }
-      return item;
-    } else if (inOrderedList) {
-      inOrderedList = false;
-      return '</ol>' + line;
-    }
-    return line;
-  }).join('\n');
-  if (inOrderedList) html += '</ol>';
-  
-  // Convert unordered lists
+  // Convert lists
   html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
   html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
   html = html.replace(/(<li>.*?<\/li>\n?)+/g, match => {
-    if (!match.includes('<ol>') && !match.includes('<table>')) {
+    if (!match.includes('<table>')) {
       return '<ul>' + match + '</ul>';
     }
     return match;
@@ -263,7 +185,7 @@ const markdownToHtml = (markdown, baseUrl, documentType) => {
 };
 
 /**
- * MAIN PDF GENERATION FUNCTION
+ * ✅ MAIN PDF GENERATION FUNCTION - FIXED
  */
 exports.generatePDF = async (req, res) => {
   let browser;
@@ -281,8 +203,8 @@ exports.generatePDF = async (req, res) => {
       return res.status(400).json({ error: 'Invalid document ID' });
     }
 
-    // Fetch document with diagrams
-    console.log('[PDF] Fetching document with diagrams...');
+    // Fetch document
+    console.log('[PDF] Fetching document...');
     const doc = await Document.findById(id);
     
     if (!doc) {
@@ -290,52 +212,34 @@ exports.generatePDF = async (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    console.log('[PDF] âœ… Document found:', doc.type);
+    console.log('[PDF] ✅ Document found:', doc.type);
     console.log('[PDF] Content length:', doc.content?.length || 0);
-    console.log('[PDF] Diagrams:', doc.diagrams?.length || 0);
-
-    // Get base URL
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    console.log('[PDF] Base URL:', baseUrl);
     
-    // âœ… FIX 3: Process content to use stored base64 from diagrams array
+    // ✅ CRITICAL FIX: Content already has base64 images or HTTP URLs
+    // We need to remove any localhost URLs and use only base64
     let contentForPdf = doc.content || '';
     
-    // Replace diagram file paths with base64 from stored diagrams
-    if (doc.diagrams && doc.diagrams.length > 0) {
-      console.log('[PDF] Processing', doc.diagrams.length, 'stored diagrams');
-      
-      doc.diagrams.forEach((diagram, index) => {
-        if (diagram.imageData) {
-          // Find references to this diagram in the content
-          const filenamePattern = diagram.fileName || `diagram-${index + 1}.png`;
-          const pathPattern = `/api/diagrams/${filenamePattern}`;
-          
-          console.log('[PDF] Replacing', pathPattern, 'with base64 data');
-          
-          // Replace file path references with base64
-          contentForPdf = contentForPdf.replace(
-            new RegExp(`!\\[(.*?)\\]\\(${pathPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g'),
-            `![$1](${diagram.imageData})`
-          );
-        }
-      });
-      
-      console.log('[PDF] âœ… Diagram replacement complete');
-    }
+    // Remove any localhost URLs (they won't work)
+    contentForPdf = contentForPdf.replace(
+      /!\[(.*?)\]\(http:\/\/localhost:\d+[^)]*\)/g,
+      '![$ 1](#)'
+    );
     
-    // Try to convert any remaining non-base64 images
-    try {
-      contentForPdf = await convertImagesToBase64(contentForPdf, baseUrl);
-      console.log('[PDF] âœ… Additional image conversion complete');
-    } catch (imageError) {
-      console.warn('[PDF] ⚠️ Some image conversions failed:', imageError.message);
-    }
+    // Remove any broken image URLs
+    contentForPdf = contentForPdf.replace(
+      /!\[(.*?)\]\(https?:\/\/[^)]+\)/g,
+      (match, alt) => {
+        console.log('[PDF] Removing broken image URL:', match);
+        return `*[Image: ${alt}]*`;
+      }
+    );
+    
+    console.log('[PDF] Content prepared for PDF generation');
     
     // Convert to HTML
     console.log('[PDF] Converting to HTML...');
-    const contentHtml = markdownToHtml(contentForPdf, baseUrl, doc.type);
-    console.log('[PDF] âœ… HTML ready:', contentHtml.length, 'chars');
+    const contentHtml = markdownToHtml(contentForPdf);
+    console.log('[PDF] ✅ HTML ready:', contentHtml.length, 'chars');
 
     // Launch Puppeteer
     console.log('[PDF] Launching browser...');
@@ -348,17 +252,16 @@ exports.generatePDF = async (req, res) => {
         '--disable-web-security'
       ]
     });
-    console.log('[PDF] âœ… Browser launched');
+    console.log('[PDF] ✅ Browser launched');
 
     const page = await browser.newPage();
     
-    // âœ… FIX 4: Enable console logging from the page
     page.on('console', msg => console.log('[PDF Browser]', msg.text()));
     page.on('pageerror', error => console.error('[PDF Browser Error]', error));
     
     const isWide = doc.type === 'Lesson Concept Breakdown' || doc.type === 'Schemes of Work';
     
-    // Build HTML with embedded base64 images
+    // Build HTML
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -392,7 +295,6 @@ exports.generatePDF = async (req, res) => {
     .content ul, .content ol { margin: 12px 0 12px 25px; }
     .content li { margin-bottom: 6px; }
     
-    /* âœ… FIX 5: Better image styling for embedded base64 */
     .content img {
       max-width: 90%;
       height: auto;
@@ -467,9 +369,8 @@ exports.generatePDF = async (req, res) => {
 
     console.log('[PDF] Setting content...');
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 90000 });
-    console.log('[PDF] âœ… Content set');
+    console.log('[PDF] ✅ Content set');
     
-    // âœ… FIX 6: Wait for base64 images to render
     await page.evaluate(() => {
       return Promise.all(
         Array.from(document.images)
@@ -497,7 +398,7 @@ exports.generatePDF = async (req, res) => {
       printBackground: true,
       margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' }
     });
-    console.log('[PDF] âœ… PDF created');
+    console.log('[PDF] ✅ PDF created');
 
     await browser.close();
     browser = null;
@@ -509,7 +410,7 @@ exports.generatePDF = async (req, res) => {
 
     const filename = `${doc.type.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.pdf`;
     
-    console.log('[PDF] âœ… SUCCESS - Size:', pdfBuffer.length, 'bytes');
+    console.log('[PDF] ✅ SUCCESS - Size:', pdfBuffer.length, 'bytes');
     console.log('[PDF] ====================================================');
     
     res.setHeader('Content-Type', 'application/pdf');
