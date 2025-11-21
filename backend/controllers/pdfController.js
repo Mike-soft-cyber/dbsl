@@ -1,4 +1,5 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium')
 const mongoose = require('mongoose');
 const fs = require('fs').promises;
 const path = require('path');
@@ -9,30 +10,63 @@ const axios = require('axios');
  * Convert diagram URLs to base64 for embedding in PDF
  */
 async function convertImagesToBase64(content, baseUrl) {
-  const imageRegex = /!\[(.*?)\]\((\/api\/diagrams\/[^)]+)\)/g;
+  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   let match;
   const replacements = [];
   
+  console.log('[PDF] Scanning content for images...');
+  
   while ((match = imageRegex.exec(content)) !== null) {
     const [fullMatch, alt, imagePath] = match;
-    const imageUrl = `${baseUrl}${imagePath}`;
+    
+    console.log(`[PDF] Found image: ${imagePath.substring(0, 50)}...`);
+    
+    // Skip if already base64
+    if (imagePath.startsWith('data:image')) {
+      console.log(`[PDF] Skipping base64 image`);
+      continue;
+    }
+    
+    // Build full URL
+    let imageUrl = imagePath;
+    if (!imagePath.startsWith('http')) {
+      // Handle relative paths
+      if (imagePath.startsWith('/api/diagrams/')) {
+        imageUrl = `${baseUrl}${imagePath}`;
+      } else if (imagePath.startsWith('/')) {
+        imageUrl = `${baseUrl}${imagePath}`;
+      } else {
+        // Just a filename
+        imageUrl = `${baseUrl}/api/diagrams/${imagePath}`;
+      }
+    }
+    
     replacements.push({ fullMatch, alt, imageUrl, imagePath });
   }
   
   console.log(`[PDF] Found ${replacements.length} images to convert`);
   
-  for (const { fullMatch, alt, imageUrl, imagePath } of replacements) {
+  for (const { fullMatch, alt, imageUrl } of replacements) {
     try {
-      console.log(`[PDF] Converting: ${imagePath}`);
+      console.log(`[PDF] Converting: ${imageUrl}`);
       
       const response = await axios.get(imageUrl, { 
         responseType: 'arraybuffer',
-        timeout: 10000,
-        validateStatus: (status) => status < 500
+        timeout: 15000,
+        validateStatus: (status) => status < 500,
+        headers: {
+          'User-Agent': 'PDF-Generator/1.0'
+        }
       });
       
       if (response.status === 404) {
-        console.warn(`[PDF] ⚠️ Image not found: ${imagePath}`);
+        console.warn(`[PDF] ⚠️ Image not found: ${imageUrl}`);
+        content = content.replace(fullMatch, `*[Image: ${alt}]*`);
+        continue;
+      }
+      
+      if (!response.data || response.data.length === 0) {
+        console.warn(`[PDF] ⚠️ Empty response for: ${imageUrl}`);
         content = content.replace(fullMatch, `*[Image: ${alt}]*`);
         continue;
       }
@@ -40,19 +74,22 @@ async function convertImagesToBase64(content, baseUrl) {
       const base64 = Buffer.from(response.data).toString('base64');
       let mimeType = response.headers['content-type'] || 'image/png';
       
-      if (imagePath.endsWith('.svg')) mimeType = 'image/svg+xml';
-      else if (imagePath.endsWith('.png')) mimeType = 'image/png';
+      // Ensure valid mime type
+      if (!mimeType.startsWith('image/')) {
+        mimeType = 'image/png';
+      }
       
       const base64Image = `data:${mimeType};base64,${base64}`;
       content = content.replace(fullMatch, `![${alt}](${base64Image})`);
       
-      console.log(`[PDF] ✅ Converted: ${imagePath}`);
+      console.log(`[PDF] ✅ Converted: ${imageUrl} (${base64.length} bytes)`);
     } catch (error) {
       console.error(`[PDF] ❌ Failed: ${imageUrl}`, error.message);
       content = content.replace(fullMatch, `*[Image: ${alt}]*`);
     }
   }
   
+  console.log(`[PDF] Image conversion complete`);
   return content;
 }
 
@@ -323,6 +360,8 @@ exports.generatePDF = async (req, res) => {
       
       console.log('[PDF] âœ… Diagram replacement complete');
     }
+
+    const isProduction = process.env.NODE_ENV === 'production';
     
     // Try to convert any remaining non-base64 images
     try {
@@ -339,16 +378,17 @@ exports.generatePDF = async (req, res) => {
 
     // Launch Puppeteer
     console.log('[PDF] Launching browser...');
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-web-security'
-      ]
-    });
-    console.log('[PDF] âœ… Browser launched');
+browser = await puppeteer.launch({
+  args: isProduction 
+    ? [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+    : ['--no-sandbox', '--disable-setuid-sandbox'],
+  defaultViewport: chromium.defaultViewport,
+  executablePath: isProduction 
+    ? await chromium.executablePath() 
+    : process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+  headless: chromium.headless || 'new'
+});
+console.log('[PDF] ✅ Browser launched');
 
     const page = await browser.newPage();
     
