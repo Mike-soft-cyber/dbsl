@@ -1,37 +1,51 @@
 const mongoose = require("mongoose");
 
 const assessmentSchema = new mongoose.Schema({
-  skill: { type: String, required: true }, // keep skill required
+  skill: { type: String, required: true },
   exceeds: { type: String, default: "" },
   meets: { type: String, default: "" },
   approaches: { type: String, default: "" },
-  below: { type: String, default: "" }, // ✅ no longer required
+  below: { type: String, default: "" },
 });
-
 
 const cbcEntrySchema = new mongoose.Schema(
   {
-    grade: { type: String, required: true },             // e.g. "Grade 7"
-    learningArea: { type: String, required: true },      // e.g. "Mathematics"
-    strand: { type: String, required: true },            // e.g. "Geometry"
-    substrand: { type: String, required: true },         // e.g. "Angles"
+    grade: { type: String, required: true },
+    learningArea: { type: String, required: true },
+    strand: { type: String, required: true },
+    substrand: { type: String, required: true },
 
-    slo: [{ type: String }],                             // Specific Learning Outcomes
-    learningExperiences: [{ type: String }],             // Activities / approaches
-    keyInquiryQuestions: [{ type: String }],             // Guiding questions
-    resources: [{ type: String }],                       // Teaching aids
-    assessment: [assessmentSchema],                      // Rubrics
-    reflection: [{ type: String }],                      // Notes for improvement
-    noOfLessons: { type: Number, default: null,
-    set: v => (v === "" || v === null ? null : v) },                      //  Number of lessons 
+    // ✅ These MUST be here:
+    ageRange: { type: String },
+    lessonDuration: { type: Number },
+    lessonsPerWeek: { type: Number },
+    
+    slo: [{ type: String }],
+    learningExperiences: [{ type: String }],
+    keyInquiryQuestions: [{ type: String }],
+    resources: [{ type: String }],
+    assessment: [assessmentSchema],
+    reflection: [{ type: String }],
+    noOfLessons: { 
+      type: Number, 
+      default: null,
+      set: v => (v === "" || v === null ? null : v) 
+    },
+
+    // ✅ These MUST be here WITHOUT enum restrictions:
+    coreCompetencies: [{ type: String }],
+    values: [{ type: String }],
+    pertinentIssues: [{ type: String }],
+    linkToOtherSubjects: [{ type: String }],
+    communityLinkActivities: [{ type: String }],
+    learningOutcomesSummary: { type: String },
   },
   { timestamps: true }
 );
 
-// Critical indexes for CBC lookups
-cbcEntrySchema.index({ grade: 1, learningArea: 1, strand: 1, substrand: 1 }); // Primary lookup
-cbcEntrySchema.index({ grade: 1, learningArea: 1 }); // Fallback lookup
-cbcEntrySchema.index({ learningArea: 1 }); // Subject filtering
-
+// Indexes
+cbcEntrySchema.index({ grade: 1, learningArea: 1, strand: 1, substrand: 1 });
+cbcEntrySchema.index({ grade: 1, learningArea: 1 });
+cbcEntrySchema.index({ learningArea: 1 });
 
 module.exports = mongoose.model("CBCEntry", cbcEntrySchema);

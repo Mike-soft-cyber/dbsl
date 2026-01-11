@@ -215,6 +215,8 @@ const cbcEntryRoutes = require('./routes/cbcEntryRoutes');
 const mpesaRoute = require('./routes/mpesaRoute');
 const docDashRoutes = require('./routes/docDashRoutes');
 const schoolConfigRoutes = require('./routes/schoolConfigRoutes');
+const curriculumConfigRoutes = require('./routes/curriculumConfigRoutes');
+const cbcReviewRoutes = require('./routes/cbcReviewRoutes');
 const imageRoutes = require('./routes/imageRoutes')
 
 app.use('/api/user', authRoutes);
@@ -227,6 +229,8 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/cbc', cbcEntryRoutes);
 app.use('/api', imageRoutes);
 app.use('/api/document-purchases', docDashRoutes);
+app.use('/api/curriculum-config', curriculumConfigRoutes);
+app.use('/api/cbc-review', cbcReviewRoutes);
 app.use('/api/school-config', schoolConfigRoutes);
 
 // ✅ 404 handler

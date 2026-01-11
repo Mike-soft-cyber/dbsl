@@ -125,62 +125,73 @@ class ContentParser {
     const lines = content.split('\n').filter(line => line.trim());
     let foundTableStart = false;
     
-    console.log('[Parser] Processing', lines.length, 'lines for Schemes table');
-    console.log('[Parser] First 10 lines:', lines.slice(0, 10));
+    console.log('[Parser] Processing Schemes table - Total lines:', lines.length);
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Log every line that contains a pipe
-      if (line.includes('|')) {
-        console.log(`[Parser] Line ${i}:`, line.substring(0, 100), '...');
-      }
-      
       // Detect table start
       if (!foundTableStart && this.isSchemeHeaderLine(line)) {
         foundTableStart = true;
-        console.log('[Parser] Found schemes table header at line', i);
+        console.log('[Parser] ✅ Found schemes table header at line', i);
         continue;
       }
       
-      // Skip until we find table
       if (!foundTableStart) continue;
       
       // Skip separator rows
-      if (line.match(/^\|[\s\-:]+\|/)) {
-        console.log('[Parser] Skipping separator row');
+      if (line.match(/^\|[\s\-:]+\|$/)) {
         continue;
       }
       
+      // Process data rows
       if (line.includes('|')) {
+        // Split and clean cells
         const cells = line
           .split('|')
-          .map(cell => cell.trim())
-          .filter(cell => cell !== '');
+          .map(cell => cell.trim());
         
-        console.log('[Parser] Schemes row - Cells:', cells.length, '- Week:', cells[0]?.substring(0, 10));
+        // Remove empty cells at start/end only
+        if (cells[0] === '') cells.shift();
+        if (cells[cells.length - 1] === '') cells.pop();
         
-        // FIXED: Accept rows with 8+ columns (more lenient)
-        if (cells.length >= 8) {
+        console.log('[Parser] Row cells:', cells.length, '- First:', cells[0]?.substring(0, 15));
+        
+        // ✅ STRICT: Only accept rows with exactly 10 columns
+        if (cells.length === 10) {
           const week = cells[0];
-          const slo = cells[4] || cells[3]; // Try column 4 or 3
+          const lesson = cells[1];
+          const slo = cells[4];
+          const reflection = cells[9];
           
-          // FIXED: More lenient validation
-          if (this.isValidSchemeRow(week, slo)) {
-            // Pad with empty strings if needed
-            while (cells.length < 10) cells.push('');
-            tableData.rows.push(cells.slice(0, 10));
-            console.log('[Parser] ✅ Added schemes row');
+          // Validate it's a real data row
+          const isValidRow = 
+            week && (week.toLowerCase().includes('week') || /^w?\d+$/i.test(week)) &&
+            lesson && (lesson.toLowerCase().includes('lesson') || /^\d+$/.test(lesson)) &&
+            slo && slo.length > 15 &&
+            reflection && reflection.length > 10 &&
+            !slo.includes('SPECIFIC LEARNING OUTCOMES') &&
+            !reflection.toUpperCase().includes('REFLECTION');
+          
+          if (isValidRow) {
+            tableData.rows.push(cells);
+            console.log('[Parser] ✅ Added row with WEEK:', week, 'REFLECTION:', reflection.substring(0, 30));
           } else {
-            console.log('[Parser] ❌ Invalid scheme row - Week:', week, 'SLO length:', slo?.length);
+            console.log('[Parser] ⚠️ Invalid row - Week:', week, 'Lesson:', lesson, 'Has reflection:', !!reflection);
           }
         } else {
-          console.log('[Parser] ❌ Insufficient columns for schemes:', cells.length);
+          console.log('[Parser] ❌ Wrong column count:', cells.length, '(need exactly 10)');
+          
+          // Log what's missing
+          if (cells.length < 10) {
+            console.log('[Parser] Missing columns:', 10 - cells.length);
+            console.log('[Parser] Cells:', cells.map((c, i) => `${i}:${c.substring(0, 20)}`).join(' | '));
+          }
         }
       }
     }
     
-    console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows from Schemes table');
+    console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows with 10 columns');
     return tableData.rows.length > 0 ? tableData : null;
   }
 
@@ -276,13 +287,17 @@ class ContentParser {
   return (lcMatchCount >= 3 || schemeMatchCount >= 5) && line.includes('|');
 }
 
-static isSchemeHeaderLine(line) {
-  const schemeHeaders = ['WEEK', 'LESSON', 'STRAND', 'SUB-STRAND'];
-  const matchCount = schemeHeaders.filter(header => 
-    line.toUpperCase().includes(header)
-  ).length;
-  return matchCount >= 2 && line.includes('|');
-}
+ static isSchemeHeaderLine(line) {
+    // More precise header detection
+    const requiredHeaders = ['WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 'SPECIFIC LEARNING OUTCOMES'];
+    const lineUpper = line.toUpperCase();
+    
+    const matchCount = requiredHeaders.filter(header => 
+      lineUpper.includes(header)
+    ).length;
+    
+    return matchCount >= 4 && line.includes('|');
+  }
 
   static isValidLearningConcept(concept) {
   if (!concept) return false;

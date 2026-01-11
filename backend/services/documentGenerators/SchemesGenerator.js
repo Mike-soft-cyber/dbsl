@@ -1,3 +1,5 @@
+// SchemesGenerator.js - FIXED VERSION with proper SLO distribution
+
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
 class SchemesGenerator extends BaseDocumentGenerator {
@@ -6,115 +8,207 @@ class SchemesGenerator extends BaseDocumentGenerator {
   }
 
   createPrompt(requestData, cbcEntry) {
-    const { school, teacherName, grade, learningArea, strand, substrand, term, weeks, lessonsPerWeek } = requestData;
+    const { 
+      school, teacherName, grade, learningArea, strand, substrand, term, 
+      weeks, lessonsPerWeek 
+    } = requestData;
     
-    const safeWeeks = weeks || 12;
+    const safeWeeks = weeks || 10;
     const safeLessonsPerWeek = lessonsPerWeek || 5;
+    const totalRows = safeWeeks * safeLessonsPerWeek;
     
-    // Use CBC noOfLessons if available, otherwise calculate from weeks (same as LessonConceptGenerator)
-    const cbcLessons = cbcEntry?.noOfLessons;
-    const totalRows = cbcLessons && cbcLessons > 0 ? cbcLessons : (safeWeeks * safeLessonsPerWeek);
+    // ✅ CRITICAL FIX: Split combined SLOs
+    let sloList = cbcEntry?.slo || [];
     
-    // Extract CBC data
-    const sloList = cbcEntry?.slo || [];
-    const learningExperiences = cbcEntry?.learningExperiences || [];
-    const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
+    // Check if SLOs are combined in a single string (e.g., "a) ... b) ... c) ...")
+    if (sloList.length === 1 && sloList[0].includes('b)')) {
+      console.log('[SchemesGen] ⚠️ Detected combined SLOs, splitting...');
+      const combined = sloList[0];
+      // Split by lowercase letter followed by closing parenthesis
+      sloList = combined
+        .split(/(?=[a-z]\))/) // Split before each "a)", "b)", "c)", etc.
+        .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim()) // Remove the letter prefix
+        .filter(slo => slo.length > 5); // Filter out empty strings
+      
+      console.log(`[SchemesGen] ✅ Split into ${sloList.length} separate SLOs`);
+    }
+    
+    // ✅ CRITICAL FIX: Split combined Learning Experiences
+    let learningExperiences = cbcEntry?.learningExperiences || [];
+    
+    if (learningExperiences.length === 1 && learningExperiences[0].includes('•')) {
+      console.log('[SchemesGen] ⚠️ Detected combined Learning Experiences, splitting...');
+      learningExperiences = learningExperiences[0]
+        .split('•')
+        .map(exp => exp.trim())
+        .filter(exp => exp.length > 5);
+      console.log(`[SchemesGen] ✅ Split into ${learningExperiences.length} separate experiences`);
+    } else if (learningExperiences.length === 1 && /\d+\.\s/.test(learningExperiences[0])) {
+      console.log('[SchemesGen] ⚠️ Detected numbered Learning Experiences, splitting...');
+      learningExperiences = learningExperiences[0]
+        .split(/\d+\.\s/)
+        .map(exp => exp.trim())
+        .filter(exp => exp.length > 5);
+      console.log(`[SchemesGen] ✅ Split into ${learningExperiences.length} separate experiences`);
+    }
+    
+    // ✅ CRITICAL FIX: Split combined Key Inquiry Questions
+    let keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
+    
+    if (keyInquiryQuestions.length === 1 && /\d+\.\s/.test(keyInquiryQuestions[0])) {
+      console.log('[SchemesGen] ⚠️ Detected combined Key Inquiry Questions, splitting...');
+      keyInquiryQuestions = keyInquiryQuestions[0]
+        .split(/\d+\.\s/)
+        .map(q => q.trim())
+        .filter(q => q.length > 5);
+      console.log(`[SchemesGen] ✅ Split into ${keyInquiryQuestions.length} separate questions`);
+    } else if (keyInquiryQuestions.length === 1 && keyInquiryQuestions[0].includes('?') && keyInquiryQuestions[0].split('?').length > 2) {
+      console.log('[SchemesGen] ⚠️ Detected question-separated KIQs, splitting...');
+      keyInquiryQuestions = keyInquiryQuestions[0]
+        .split('?')
+        .map(q => q.trim() + (q.trim() ? '?' : ''))
+        .filter(q => q.length > 5 && q !== '?');
+      console.log(`[SchemesGen] ✅ Split into ${keyInquiryQuestions.length} separate questions`);
+    }
+    
     const resources = cbcEntry?.resources || [];
-    const assessmentData = cbcEntry?.assessment || [];
-    const reflectionNotes = cbcEntry?.reflection || [];
-    const noOfLessons = cbcLessons || totalRows;
 
-    const hasResources = resources && resources.length > 0;
-    const hasReflections = reflectionNotes && reflectionNotes.length > 0;
+    // ✅ Calculate lessons per SLO for distribution
+    const lessonsPerSLO = Math.ceil(totalRows / sloList.length);
 
-    return `Generate a Schemes of Work with a properly formatted markdown table.
+    return `⚠️ CRITICAL: Generate a table with EXACTLY 10 COLUMNS in this EXACT order:
 
-SCHOOL: ${this.escapeForPrompt(school)}
-FACILITATOR: ${this.escapeForPrompt(teacherName)}
-GRADE: ${this.escapeForPrompt(grade)}
-SUBJECT: ${this.escapeForPrompt(learningArea)}
-TERM: ${this.escapeForPrompt(term)}
+| WEEK | LESSON | STRAND | SUB-STRAND | SPECIFIC LEARNING OUTCOMES (SLO) | LEARNING EXPERIENCES | KEY INQUIRY QUESTION (KIQ) | LEARNING RESOURCES | ASSESSMENT | REFLECTION |
+
+═══════════════════════════════════════════════════════════════════
+📋 SLO DISTRIBUTION STRATEGY (CRITICAL - FOLLOW EXACTLY)
+═══════════════════════════════════════════════════════════════════
+
+You have ${sloList.length} SLOs to distribute across ${totalRows} lessons.
+Each SLO should cover approximately ${lessonsPerSLO} lessons.
+
+**DISTRIBUTION PLAN:**
+${sloList.map((slo, idx) => {
+  const letter = String.fromCharCode(97 + idx); // a, b, c, d
+  const startLesson = idx * lessonsPerSLO + 1;
+  const endLesson = Math.min((idx + 1) * lessonsPerSLO, totalRows);
+  return `
+SLO (${letter}): "${slo.substring(0, 80)}..."
+→ Use in Lessons ${startLesson}-${endLesson}
+→ In the SLO column, write: "(${letter}) ${slo}"
+`;
+}).join('\n')}
+
+**EXAMPLE ROWS SHOWING CORRECT SLO DISTRIBUTION:**
+
+Lesson 1-${lessonsPerSLO}:
+| Week 1 | Lesson 1 | ${strand} | ${substrand} | (a) ${sloList[0]?.substring(0, 50)}... | ${learningExperiences[0]?.substring(0, 40)}... | ${keyInquiryQuestions[0]?.substring(0, 35)}? | ${resources.slice(0, 2).join(', ')} | Observation | Were learners able to ${sloList[0]?.substring(0, 30)}...? |
+
+Lesson ${lessonsPerSLO + 1}-${lessonsPerSLO * 2}:
+| Week X | Lesson Y | ${strand} | ${substrand} | (b) ${sloList[1]?.substring(0, 50)}... | ${learningExperiences[1]?.substring(0, 40)}... | ${keyInquiryQuestions[1]?.substring(0, 35)}? | ${resources.slice(0, 2).join(', ')} | Portfolio | Did learners ${sloList[1]?.substring(0, 30)}...? |
+
+═══════════════════════════════════════════════════════════════════
+📊 DOCUMENT INFORMATION
+═══════════════════════════════════════════════════════════════════
+
+SCHOOL: ${school}
+FACILITATOR: ${teacherName}
+GRADE: ${grade}
+SUBJECT: ${learningArea}
+TERM: ${term}
 WEEKS: ${safeWeeks}
 LESSONS PER WEEK: ${safeLessonsPerWeek}
 TOTAL LESSONS: ${totalRows}
-CBC LESSONS REFERENCE: ${noOfLessons}
 
-## CBC FRAMEWORK DATA REFERENCE:
+⚠️ MANDATORY REQUIREMENTS:
+1. Generate EXACTLY ${totalRows} rows
+2. Each row MUST have EXACTLY 10 columns separated by |
+3. DO NOT skip any columns
+4. DO NOT merge columns
+5. Each row MUST be on ONE continuous line
+6. Follow the SLO distribution plan above EXACTLY
 
-### SPECIFIC LEARNING OUTCOMES (SLOs):
-${sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n')}
+═══════════════════════════════════════════════════════════════════
+📊 CBC CURRICULUM DATA
+═══════════════════════════════════════════════════════════════════
 
-### LEARNING EXPERIENCES AVAILABLE:
+STRAND: ${strand}
+SUB-STRAND: ${substrand}
+
+SPECIFIC LEARNING OUTCOMES (distribute as shown above):
+${sloList.map((slo, i) => `${String.fromCharCode(97 + i)}) ${slo}`).join('\n')}
+
+LEARNING EXPERIENCES (rotate through these):
 ${learningExperiences.map((exp, i) => `${i+1}. ${exp}`).join('\n')}
 
-### KEY INQUIRY QUESTIONS BANK:
+KEY INQUIRY QUESTIONS (rotate through these):
 ${keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n')}
 
-### ASSESSMENT SKILLS TO TRACK:
-${assessmentData.map((criteria, i) => `${i+1}. ${criteria.skill}`).join('\n')}
+LEARNING RESOURCES (use these):
+${resources.join(', ')}
 
-${hasResources ? `### AVAILABLE RESOURCES:
-${resources.map((resource, i) => `${i+1}. ${resource}`).join('\n')}` : `### GENERATE RESOURCE BANK:
-Create 8 diverse teaching resources for ${this.escapeForPrompt(substrand)} in ${this.escapeForPrompt(learningArea)}.`}
+═══════════════════════════════════════════════════════════════════
+📝 COLUMN-BY-COLUMN REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
 
-${hasReflections ? `### REFLECTION FRAMEWORK:
-${reflectionNotes.map((note, i) => `${i+1}. ${note}`).join('\n')}` : `### GENERATE REFLECTION FRAMEWORK:
-Create 5 reflection criteria for evaluating teaching effectiveness.`}
+Column 1 - WEEK:
+Format: "Week 1", "Week 2", ... "Week ${safeWeeks}"
 
-CRITICAL TABLE FORMATTING INSTRUCTIONS:
-You MUST create a markdown table where EACH COMPLETE ROW is on ONE SINGLE LINE.
+Column 2 - LESSON:
+Format: "Lesson 1", "Lesson 2", ... "Lesson ${totalRows}"
 
-CORRECT FORMAT EXAMPLE:
-| Week | Lesson | Strand | Sub-strand | SLO | Learning Experiences | KIQ | Resources | Assessment | Reflection |
-|------|--------|--------|------------|-----|---------------------|-----|-----------|------------|-----------|
-| Week 1 | 1 | Mathematics | Addition | By the end of the lesson learners should be able to add single digit numbers | Learners will practice addition using counters and number lines | How do we combine numbers? | Counters, number cards | Observation, oral questions | Were learners engaged? |
-| Week 1 | 2 | Mathematics | Addition | By the end of the lesson learners should be able to solve addition word problems | Learners will work in pairs to solve real-world addition scenarios | When do we use addition in daily life? | Word problem cards, charts | Written work, peer assessment | Did learners understand application? |
+Column 3 - STRAND:
+Same for all rows: ${strand}
 
-WRONG FORMAT (DO NOT DO THIS - cells split across lines):
-| Week |
-| Lesson | Strand |
-|------|
-| Week 1 |
-| 1 | Mathematics |
+Column 4 - SUB-STRAND:
+Same for all rows: ${substrand}
 
-TABLE STRUCTURE (10 columns - ALL on ONE LINE per row):
-1. WEEK: Week 1, Week 2, ... Week ${safeWeeks}
-2. LESSON: Lesson number (1-${safeLessonsPerWeek} per week)
-3. STRAND: Always "${this.escapeForPrompt(strand)}"
-4. SUB-STRAND: Always "${this.escapeForPrompt(substrand)}"
-5. SPECIFIC LEARNING OUTCOMES (SLO): Rotate through the ${sloList.length} SLOs
-6. LEARNING EXPERIENCES: Rotate through the ${learningExperiences.length} experiences
-7. KEY INQUIRY QUESTION (KIQ): Rotate through the ${keyInquiryQuestions.length} questions
-8. LEARNING RESOURCES: Use actual resources: ${resources.join(', ') || 'textbooks, charts, models'}
-9. ASSESSMENT: Vary methods (observation, oral, practical, written, portfolio)
-10. REFLECTION: Short reflection point (5-10 words)
+Column 5 - SPECIFIC LEARNING OUTCOMES (SLO):
+⚠️ CRITICAL: Reference SLOs with (a), (b), (c), (d) following the distribution plan
+- Lessons 1-${lessonsPerSLO}: Use "(a) ${sloList[0]?.substring(0, 60)}..."
+- Lessons ${lessonsPerSLO + 1}-${lessonsPerSLO * 2}: Use "(b) ${sloList[1]?.substring(0, 60)}..."
+- Continue this pattern for all SLOs
 
-SLO BANK TO ROTATE:
-${sloList.map((slo, i) => `SLO${i+1}: ${slo}`).join('\n')}
+Column 6 - LEARNING EXPERIENCES:
+Choose from the list above, rotate through them appropriately
 
-LEARNING EXPERIENCES BANK:
-${learningExperiences.map((exp, i) => `EXP${i+1}: ${exp}`).join('\n')}
+Column 7 - KEY INQUIRY QUESTION (KIQ):
+Choose from the list above, match to the current SLO when possible
 
-KEY INQUIRY QUESTIONS BANK:
-${keyInquiryQuestions.map((q, i) => `KIQ${i+1}: ${q}`).join('\n')}
+Column 8 - LEARNING RESOURCES:
+2-3 resources from: ${resources.join(', ')}
 
-ASSESSMENT SKILLS TO REFERENCE:
-${assessmentData.map(a => a.skill).join(', ')}
+Column 9 - ASSESSMENT:
+Methods: Observation, Oral questions, Practical task, Portfolio, Group discussion
 
-Create exactly ${totalRows} complete rows based on CBC reference of ${noOfLessons} lessons.
+Column 10 - REFLECTION:
+Teacher reflection question starting with: "Were learners...", "Did learners...", "Could learners..."
 
-CRITICAL RULES:
-1. Each row must be ONE CONTINUOUS LINE with all 10 columns
-2. Use pipe (|) to separate columns: | col1 | col2 | col3 |
-3. Keep cells concise (20-50 words for SLO, 10-30 words for others)
-4. NO line breaks within cells
-5. NO splitting rows across multiple lines
-6. Start each row with | and end with |
+═══════════════════════════════════════════════════════════════════
+✅ VERIFICATION BEFORE OUTPUT
+═══════════════════════════════════════════════════════════════════
 
-Output ONLY the table in this format:
-| Week | Lesson | Strand | Sub-strand | SPECIFIC LEARNING OUTCOMES (SLO) | LEARNING EXPERIENCES | KEY INQUIRY QUESTION (KIQ) | LEARNING RESOURCES | ASSESSMENT | REFLECTION |
-|------|--------|--------|------------|-----------------------------------|---------------------|----------------------------|-------------------|------------|------------|
-[${totalRows} complete data rows, each on ONE LINE]`;
+Count your rows: Should be ${totalRows}
+Count your columns per row: Should be 10
+Check SLO distribution: Should change from (a) to (b) to (c) to (d) at the right lessons
+Check first row has all columns: WEEK, LESSON, STRAND, SUB-STRAND, SLO, LEARNING EXPERIENCES, KEY INQUIRY QUESTION, LEARNING RESOURCES, ASSESSMENT, REFLECTION
+Check last row has all columns: Same as above
+
+═══════════════════════════════════════════════════════════════════
+🚀 START GENERATING NOW
+═══════════════════════════════════════════════════════════════════
+
+Output ONLY the table with ${totalRows} complete rows.
+Start with the header, then generate all rows following the SLO distribution plan.
+
+| WEEK | LESSON | STRAND | SUB-STRAND | SPECIFIC LEARNING OUTCOMES (SLO) | LEARNING EXPERIENCES | KEY INQUIRY QUESTION (KIQ) | LEARNING RESOURCES | ASSESSMENT | REFLECTION |
+|------|--------|--------|------------|----------------------------------|----------------------|---------------------------|-------------------|------------|------------|
+[NOW GENERATE ALL ${totalRows} ROWS WITH PROPER SLO DISTRIBUTION]`;
+  }
+
+  escapeForPrompt(text) {
+    if (!text) return '';
+    return String(text).replace(/["'\\]/g, '\\$&').trim();
   }
 }
 

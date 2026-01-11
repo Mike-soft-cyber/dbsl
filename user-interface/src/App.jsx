@@ -19,6 +19,8 @@ import AdminPages from './pages/AdminPages';
 import DocumentPage from './pages/DocumentPage';
 import VerifyEmail from './pages/VerifyEmail';
 import MyDocumentsPage from './pages/MyDocuments';
+import CBCReviewPage from './pages/CBCReviewPage';
+import PendingReviewsDashboard from './pages/PendingReviewsDashboard';
 
 function App(){
     return (
@@ -33,6 +35,8 @@ function App(){
                 <Route path="/dashboard" element={<DashBoard />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/documents/:id" element={<DocumentPage />} />
+                <Route path="/review" element={<CBCReviewPage />} />
+                <Route path="/pending-reviews" element={<PendingReviewsDashboard />} />
                 <Route path="/my-documents" element={<MyDocumentsPage />} />
                 <Route path="/profile" element={<AdminSettings />} />
                 <Route path="/adminPages" element={<AdminPages />}>

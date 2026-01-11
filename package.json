@@ -3,7 +3,8 @@
 		"dev": "concurrently \"pnpm run backend\" \"pnpm run user-interface\"",
 		"backend": "cd backend && pnpm run dev",
 		"user-interface": "cd user-interface && pnpm run dev",
-		"extract-cbc": "node backend/models/extractCBC.js"
+		"extract-cbc": "node backend/models/extractCBC.js",
+		"seed:curriculum": "node backend/seeders/curriculumSeeder.js"
 	},
 	"devDependencies": {
 		"concurrently": "^9.2.0"

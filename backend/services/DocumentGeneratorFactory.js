@@ -1,11 +1,10 @@
-// DocumentGeneratorFactory.js - COMPLETE VERSION with FIXED markdown cleaning
+// DocumentGeneratorFactory.js - SIMPLIFIED VERSION WITHOUT DIAGRAMS
 const LessonConceptGenerator = require('./documentGenerators/LessonConceptGenerator');
 const SchemesGenerator = require('./documentGenerators/SchemesGenerator');
 const LessonPlanGenerator = require('./documentGenerators/LessonPlanGenerator');
 const LessonNotesGenerator = require('./documentGenerators/LessonNotesGenerator');
 const ExercisesGenerator = require('./documentGenerators/ExercisesGenerator');
-const DiagramService = require('./DiagramService');
-const { postProcessGeneratedContent, expandSLOs } = require('../utils/contentProcessor');
+const { postProcessGeneratedContent } = require('../utils/contentProcessor');
 const Document = require('../models/Document');
 
 class DocumentGeneratorFactory {
@@ -20,7 +19,6 @@ class DocumentGeneratorFactory {
   static cbcCache = new Map();
   static cacheTimeout = 5 * 60 * 1000;
   static MAX_CONTENT_SIZE = 16000000;
-  static MAX_DIAGRAMS = 5;
 
   static getCachedCBC(key) {
     const cached = this.cbcCache.get(key);
@@ -35,131 +33,107 @@ class DocumentGeneratorFactory {
     this.cbcCache.set(key, { data, timestamp: Date.now() });
   }
 
+  static async getCurriculumConfig(grade, learningArea) {
+    try {
+      console.log(`[CurriculumConfig] Fetching for ${grade} - ${learningArea}`);
+      
+      const LevelConfig = require('../models/LevelConfig');
+      const SubjectConfig = require('../models/SubjectConfig');
+      
+      const levelConfig = await LevelConfig.findOne({ 
+        grades: grade 
+      });
+      
+      const subjectConfig = await SubjectConfig.findOne({
+        subject: { $regex: new RegExp(learningArea, 'i') },
+        grades: grade
+      });
+      
+      if (!levelConfig || !subjectConfig) {
+        console.warn(`[CurriculumConfig] Using defaults`);
+        return {
+          lessonDuration: 40,
+          lessonsPerWeek: 5,
+          ageRange: 'Not specified',
+          weeks: { term1: 10, term2: 11, term3: 6 }
+        };
+      }
+      
+      return {
+        lessonDuration: levelConfig.lessonDuration,
+        lessonsPerWeek: subjectConfig.lessonsPerWeek,
+        ageRange: levelConfig.ageRange,
+        weeks: subjectConfig.termWeeks || { term1: 10, term2: 11, term3: 6 }
+      };
+      
+    } catch (error) {
+      console.error('[CurriculumConfig] Error:', error);
+      return {
+        lessonDuration: 40,
+        lessonsPerWeek: 5,
+        ageRange: 'Not specified',
+        weeks: { term1: 10, term2: 11, term3: 6 }
+      };
+    }
+  }
+
   /**
-   * ✅ MAIN GENERATION METHOD - FIXED markdown cleaning
+   * ✅ MAIN GENERATION METHOD - SIMPLIFIED (NO DIAGRAMS)
    */
   static async generate(type, requestData, cbcEntry) {
     const startTime = Date.now();
     
     try {
-      console.log(`[DocumentGen] Starting ${type} generation with web references only...`);
+      console.log(`[DocumentGen] Starting ${type} generation`);
       
-      if (!requestData || !cbcEntry) {
-        throw new Error('Missing required data for document generation');
-      }
-
-      // Generate AI content
-      const aiContent = await this.generateWithSLOBasedDiagramInstructions(
-        type, 
-        requestData, 
-        cbcEntry
+      const curriculumConfig = await this.getCurriculumConfig(
+        requestData.grade, 
+        requestData.learningArea
       );
       
-      let processedContent = postProcessGeneratedContent(aiContent, type);
-      let finalContent = processedContent;
-      let diagramStats = { total: 0, successful: 0, failed: 0, skipped: 0 };
+      const termNumber = requestData.term?.replace('Term ', '').replace('term', '');
+      const termWeekMap = {
+        '1': curriculumConfig.weeks.term1 || 10,
+        '2': curriculumConfig.weeks.term2 || 11,
+        '3': curriculumConfig.weeks.term3 || 6
+      };
+      const weeksForTerm = termWeekMap[termNumber] || 10;
+      const expectedRows = weeksForTerm * curriculumConfig.lessonsPerWeek;
 
-      // ✅ Check for diagram placeholders
-      console.log(`[DocumentGen] Checking for diagram placeholders...`);
-      const hasDiagramPlaceholders = processedContent.includes('[DIAGRAM:');
-      console.log(`[DocumentGen] Diagram placeholders found: ${hasDiagramPlaceholders}`);
+      console.log(`[DocumentGen] ✅ Configuration:`, {
+        term: requestData.term,
+        weeks: weeksForTerm,
+        lessonsPerWeek: curriculumConfig.lessonsPerWeek,
+        expectedRows: expectedRows
+      });
 
-      if (hasDiagramPlaceholders) {
-        try {
-          console.log('[DocumentGen] 🖼️ Processing diagrams with LOCAL IMAGE LIBRARY...');
-          
-          const diagramResult = await DiagramService.processInlineDiagrams(
-  processedContent,
-  {
-    grade: requestData.grade,
-    learningArea: requestData.learningArea,
-    strand: requestData.strand,
-    substrand: requestData.substrand,
-    cbcEntry: cbcEntry,
-    maxDiagrams: 5,
-    learningConcepts: requestData.learningConcepts || [],
-    baseURL: process.env.BACKEND_URL || 'https://dbsl.onrender.com'  // ✅ Pass explicitly
-  }
-);
-          
-          if (diagramResult && diagramResult.content) {
-            finalContent = diagramResult.content;
-            diagramStats = diagramResult.stats || diagramStats;
-
-            // 🔍 DEBUG: Check final content for image URLs
-        console.log('[DocumentGen] 🔍 DEBUG: Checking final content for image URLs:');
-        const imageUrls = finalContent.match(/!\[.*?\]\((.*?)\)/g) || [];
-        imageUrls.forEach((url, index) => {
-          console.log(`[DocumentGen] 🔍 DEBUG: Image URL ${index + 1}: ${url}`);
-        });
-            
-            // ✅ FIXED: ONLY clean markdown, NEVER add it back
-            console.log('[DocumentGen] 🧹 Cleaning markdown from content...');
-            
-            // 1. Remove ** from figure headings ONLY (don't add them back)
-            finalContent = finalContent.replace(
-              /###\s+([^\n]*Figure\s+\d+:)\s*\*\*([^\*]+)\*\*([^\n]*)/gi,
-              '### $1 $2$3'
-            );
-
-            // 2. Remove ** from concept names in ANY context
-            finalContent = finalContent.replace(/\*\*([^\*]+)\*\*/g, '$1');
-
-            // 3. Clean image markdown: remove any ** from alt text and URLs
-            finalContent = finalContent.replace(
-              /!\[([^\]]*)\]\(([^)]+)\)/g,
-              (match, alt, url) => {
-                // Clean alt text - ONLY REMOVE markdown, never add
-                const cleanAlt = alt
-                  .replace(/\*\*/g, '')
-                  .replace(/\*/g, '')
-                  .replace(/\_\_/g, '')
-                  .replace(/\_/g, '')
-                  .trim();
-                
-                // Clean URL - ONLY REMOVE markdown, never add
-                const cleanUrl = url
-                  .replace(/\*\*/g, '')
-                  .replace(/\*/g, '')
-                  .replace(/\_\_/g, '')
-                  .replace(/\_/g, '')
-                  .trim();
-                
-                return `![${cleanAlt}](${cleanUrl})`;
-              }
-            );
-            
-            console.log('[DocumentGen] ✅ Cleaned markdown formatting from content');
-            
-            console.log(`[DocumentGen] ✅ Processed diagrams:`);
-            console.log(`[DocumentGen]    Total: ${diagramStats.total}`);
-            console.log(`[DocumentGen]    Successful: ${diagramStats.successful}`);
-            console.log(`[DocumentGen]    Skipped: ${diagramStats.skipped}`);
-            
-            if (diagramStats.averageMatchScore) {
-              console.log(`[DocumentGen]    Average match: ${diagramStats.averageMatchScore}%`);
-            }
-          } else {
-            console.warn('[DocumentGen] ⚠️ Diagram processing returned no result');
-          }
-        } catch (diagramError) {
-          console.error('[DocumentGen] ❌ Local image processing failed:', diagramError.message);
-          // Remove placeholders if processing fails
-          finalContent = processedContent.replace(/\[DIAGRAM:[^\]]+\]/g, '');
-        }
-      } else {
-        console.log('[DocumentGen] ℹ️ No diagram placeholders in content - skipping diagram processing');
+      // Get the appropriate generator
+      const generator = this.generators[type];
+      
+      if (!generator) {
+        throw new Error(`No generator found for type: ${type}`);
       }
 
+      // Generate content
+      const aiContent = await generator.generate(requestData, cbcEntry);
+      
+      // Process content
+      let processedContent = postProcessGeneratedContent(aiContent, type);
+      
       // Create document metadata
       const documentMetadata = {
         generationTime: Date.now() - startTime,
-        diagramStats: diagramStats,
         cbcDataQuality: this.assessCBCQuality(cbcEntry),
         aiModel: 'gpt-4o-mini',
-        contentLength: finalContent.length,
-        localImages: diagramStats.successful || 0,
-        hasImages: (diagramStats.successful || 0) > 0
+        contentLength: processedContent.length,
+        hasImages: false,
+        curriculumConfig: {
+          weeks: weeksForTerm,
+          lessonsPerWeek: curriculumConfig.lessonsPerWeek,
+          ageRange: curriculumConfig.ageRange,
+          lessonDuration: curriculumConfig.lessonDuration,
+          expectedRows: expectedRows
+        }
       };
 
       // Create document
@@ -173,25 +147,23 @@ class DocumentGeneratorFactory {
         strand: requestData.strand,
         substrand: requestData.substrand,
         cbcEntry: cbcEntry._id,
-        content: finalContent,
+        content: processedContent,
         diagrams: [],
         references: {
           slo: cbcEntry.slo?.slice(0, 3).join('; ') || '',
           experiences: cbcEntry.learningExperiences?.slice(0, 2).join('; ') || '',
           assessments: cbcEntry.assessment?.map(a => a.skill).slice(0, 3).join(', ') || '',
-          keyConcepts: this.extractKeyConcepts(cbcEntry.slo)
         },
         resources: cbcEntry.resources || [],
         keyInquiryQuestions: cbcEntry.keyInquiryQuestions || [],
         status: "completed",
         metadata: documentMetadata,
         version: 1,
-        generatedBy: 'AI with local image library'
+        generatedBy: 'AI'
       });
 
       console.log(`[DocumentGen] ✅ ${type} generated successfully in ${Date.now() - startTime}ms`);
       console.log(`[DocumentGen] Document ID: ${newDoc._id}`);
-      console.log(`[DocumentGen] Local images: ${diagramStats.successful || 0}`);
       
       return newDoc;
 
@@ -203,167 +175,205 @@ class DocumentGeneratorFactory {
   }
 
   /**
-   * ✅ Generate content with SLO-based diagram instructions
+   * ✅ Generate Scheme of Work from existing Lesson Concept Breakdown
    */
-  static async generateWithSLOBasedDiagramInstructions(type, requestData, cbcEntry) {
-    const generator = this.generators[type];
+  static async generateSchemeFromConcepts(requestData, cbcEntry) {
+    const startTime = Date.now();
     
-    if (!generator) {
-      throw new Error(`No generator found for type: ${type}`);
-    }
-
-    // Enhance request data with SLO-based diagram instructions
-    const enhancedRequestData = {
-      ...requestData,
-      diagramInstructions: this.getSLOBasedDiagramInstructions(cbcEntry),
-      maxDiagrams: this.MAX_DIAGRAMS,
-      cbcContext: {
-        specificLearningOutcomes: cbcEntry.specificLearningOutcomes || cbcEntry.slo || [],
-        keyInquiryQuestions: cbcEntry.keyInquiryQuestions || [],
-        suggestedLearningActivities: cbcEntry.suggestedLearningActivities || cbcEntry.learningExperiences || [],
-        coreCompetencies: cbcEntry.coreCompetencies || [],
-        values: cbcEntry.values || [],
-        keyConcepts: this.extractKeyConcepts(cbcEntry.slo)
+    try {
+      console.log('[SchemeFromConcepts] Starting generation');
+      
+      const { learningConcepts, sourceBreakdownId } = requestData;
+      
+      if (!learningConcepts || learningConcepts.length === 0) {
+        throw new Error('No learning concepts provided');
       }
-    };
-
-    return await generator.generate(enhancedRequestData, cbcEntry);
-  }
-
-  /**
-   * ✅ Get SLO-based diagram instructions
-   */
-  static getSLOBasedDiagramInstructions(cbcEntry) {
-    if (!cbcEntry?.slo || cbcEntry.slo.length === 0) {
-      return this.getGenericDiagramInstructions();
+      
+      // Split combined SLOs/experiences/questions
+      let sloList = cbcEntry?.slo || [];
+      if (sloList.length === 1 && sloList[0].includes('b)')) {
+        sloList = sloList[0]
+          .split(/(?=[a-z]\))/)
+          .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim())
+          .filter(slo => slo.length > 5);
+      }
+      
+      let learningExperiences = cbcEntry?.learningExperiences || [];
+      if (learningExperiences.length === 1 && learningExperiences[0].includes('•')) {
+        learningExperiences = learningExperiences[0].split('•').map(e => e.trim()).filter(e => e.length > 5);
+      }
+      
+      let keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
+      if (keyInquiryQuestions.length === 1 && /\d+\.\s/.test(keyInquiryQuestions[0])) {
+        keyInquiryQuestions = keyInquiryQuestions[0].split(/\d+\.\s/).map(q => q.trim()).filter(q => q.length > 5);
+      }
+      
+      // Build the scheme content
+      const schemeContent = this.buildSchemeContentFromConcepts(
+        requestData,
+        learningConcepts,
+        sloList,
+        learningExperiences,
+        keyInquiryQuestions,
+        cbcEntry
+      );
+      
+      // Create the document
+      const newDoc = await Document.create({
+        teacher: requestData.teacher,
+        type: 'Schemes of Work',
+        term: requestData.term,
+        grade: requestData.grade,
+        school: requestData.school,
+        subject: requestData.learningArea,
+        strand: requestData.strand,
+        substrand: requestData.substrand,
+        cbcEntry: cbcEntry._id,
+        content: schemeContent,
+        diagrams: [],
+        references: {
+          slo: cbcEntry.slo?.slice(0, 3).join('; ') || '',
+          experiences: cbcEntry.learningExperiences?.slice(0, 2).join('; ') || '',
+          assessments: cbcEntry.assessment?.map(a => a.skill).slice(0, 3).join(', ') || '',
+        },
+        resources: cbcEntry.resources || [],
+        keyInquiryQuestions: cbcEntry.keyInquiryQuestions || [],
+        status: "completed",
+        metadata: {
+          generationTime: Date.now() - startTime,
+          sourceDocument: sourceBreakdownId,
+          sourceType: 'Lesson Concept Breakdown',
+          conceptsUsed: learningConcepts.length,
+          generatedFrom: 'breakdown'
+        },
+        version: 1,
+        generatedBy: 'Concept-based generation'
+      });
+      
+      console.log('[SchemeFromConcepts] ✅ Generated:', newDoc._id);
+      return newDoc;
+      
+    } catch (error) {
+      console.error('[SchemeFromConcepts] ❌ Error:', error);
+      throw error;
     }
-
-    const keyConcepts = this.extractKeyConcepts(cbcEntry.slo);
-    const diagramType = this.determineDiagramTypeFromSLO(cbcEntry.slo, cbcEntry.learningArea);
-
-    return `
-🎯 SLO-BASED DIAGRAM GENERATION
-
-SPECIFIC LEARNING OUTCOMES:
-${cbcEntry.slo.map((slo, i) => `${i+1}. ${slo}`).join('\n')}
-
-KEY CONCEPTS IDENTIFIED: ${keyConcepts.join(', ')}
-RECOMMENDED DIAGRAM TYPE: ${diagramType}
-
-CRITICAL DIAGRAM REQUIREMENTS:
-1. Each diagram MUST directly illustrate the specific learning outcomes above
-2. Include Kenyan context and real-world examples
-3. Use professional educational style suitable for ${cbcEntry.grade}
-4. White background for printability
-5. Clear labels and annotations (minimum 16pt font)
-6. Maximum ${this.MAX_DIAGRAMS} strategically placed diagrams
-
-DIAGRAM FORMAT INSTRUCTIONS:
-When you need to include a diagram, use this EXACT JSON format:
-
-[DIAGRAM:{
-  "description": "Detailed description for AI image generation (40+ words with specific visual elements)",
-  "caption": "Educational caption for students (Figure X: ...)",
-  "context": "Why this diagram is needed at this point",
-  "educationalPurpose": "What students should learn from this diagram - reference specific SLO",
-  "visualElements": ["specific element 1", "specific element 2", "specific element 3"],
-  "labels": ["label 1", "label 2", "label 3"],
-  "sloReference": "Specific learning outcome this diagram supports"
-}]
-
-Focus on the most important concepts that need visual explanation from the learning outcomes above.
-`;
   }
 
   /**
-   * ✅ Extract key concepts from SLO array
+   * ✅ Generate Lesson Plan from a specific concept in breakdown
    */
-  static extractKeyConcepts(sloArray) {
-    if (!sloArray || sloArray.length === 0) return [];
+  static async generateLessonPlanFromConcept(requestData, cbcEntry) {
+    const startTime = Date.now();
     
-    const concepts = new Set();
+    try {
+      console.log('[LessonPlanFromConcept] Starting generation for:', requestData.specificConcept);
+      
+      // Get the LessonPlanGenerator
+      const generator = this.generators['Lesson Plan'];
+      
+      if (!generator) {
+        throw new Error('LessonPlanGenerator not found');
+      }
+      
+      // Generate the lesson plan content
+      const aiContent = await generator.generate(requestData, cbcEntry);
+      const processedContent = postProcessGeneratedContent(aiContent, 'Lesson Plan');
+      
+      // Create the document
+      const newDoc = await Document.create({
+        teacher: requestData.teacher,
+        type: 'Lesson Plan',
+        term: requestData.term,
+        grade: requestData.grade,
+        school: requestData.school,
+        subject: requestData.learningArea,
+        strand: requestData.strand,
+        substrand: requestData.substrand,
+        cbcEntry: cbcEntry._id,
+        content: processedContent,
+        diagrams: [],
+        lessonDetails: {
+          weekNumber: requestData.weekNumber,
+          lessonNumber: requestData.lessonNumber,
+          specificConcept: requestData.specificConcept
+        },
+        references: {
+          slo: cbcEntry.slo?.slice(0, 3).join('; ') || '',
+          experiences: cbcEntry.learningExperiences?.slice(0, 2).join('; ') || '',
+        },
+        resources: cbcEntry.resources || [],
+        keyInquiryQuestions: cbcEntry.keyInquiryQuestions || [],
+        status: "completed",
+        metadata: {
+          generationTime: Date.now() - startTime,
+          sourceDocument: requestData.sourceBreakdownId,
+          sourceType: 'Lesson Concept Breakdown',
+          lessonNumber: requestData.lessonNumber,
+          specificConcept: requestData.specificConcept,
+          generatedFrom: 'concept'
+        },
+        version: 1,
+        generatedBy: 'Concept-based generation'
+      });
+      
+      console.log('[LessonPlanFromConcept] ✅ Generated:', newDoc._id);
+      return newDoc;
+      
+    } catch (error) {
+      console.error('[LessonPlanFromConcept] ❌ Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Build Scheme of Work table from learning concepts
+   */
+  static buildSchemeContentFromConcepts(
+    requestData,
+    learningConcepts,
+    sloList,
+    learningExperiences,
+    keyInquiryQuestions,
+    cbcEntry
+  ) {
+    const { school, teacherName, grade, learningArea, strand, substrand, term } = requestData;
+    const resources = cbcEntry?.resources || ['Realia', 'charts', 'textbooks'];
     
-    sloArray.forEach(slo => {
-      const sloLower = slo.toLowerCase();
+    const assessmentMethods = ['Observation', 'Oral questions', 'Practical task', 'Portfolio assessment', 'Group discussion'];
+    
+    // Build header
+    let content = `SCHOOL: ${school}\n`;
+    content += `FACILITATOR: ${teacherName}\n`;
+    content += `GRADE: ${grade}\n`;
+    content += `SUBJECT: ${learningArea}\n`;
+    content += `TERM: ${term}\n`;
+    content += `WEEKS: ${Math.ceil(learningConcepts.length / 5)}\n\n`;
+    
+    // Build table
+    content += `| WEEK | LESSON | STRAND | SUB-STRAND | SPECIFIC LEARNING OUTCOMES (SLO) | LEARNING EXPERIENCES | KEY INQUIRY QUESTION (KIQ) | LEARNING RESOURCES | ASSESSMENT | REFLECTION |\n`;
+    content += `|------|--------|--------|------------|----------------------------------|----------------------|---------------------------|-------------------|------------|------------|\n`;
+    
+    learningConcepts.forEach((conceptObj, index) => {
+      const lessonNum = index + 1;
+      const weekNum = Math.floor(index / 5) + 1;
       
-      const cleaned = sloLower
-        .replace(/(describe|explain|identify|analyze|compare|contrast|classify|demonstrate|understand|learn about)\s+/g, '')
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .trim();
+      // Map concept to appropriate SLO
+      const sloIndex = Math.floor(index / Math.ceil(learningConcepts.length / sloList.length));
+      const actualSloIndex = Math.min(sloIndex, sloList.length - 1);
+      const letter = String.fromCharCode(97 + actualSloIndex);
+      const slo = `(${letter}) ${conceptObj.concept}`;
       
-      const words = cleaned.split(/\s+/)
-        .filter(word => word.length > 3)
-        .slice(0, 5);
+      // Rotate experiences and questions
+      const experience = learningExperiences[Math.floor(index / 2) % learningExperiences.length] || 'Learners engage in learning activities';
+      const question = keyInquiryQuestions[Math.floor(index / 3) % keyInquiryQuestions.length] || 'What did we learn?';
+      const resource = resources.slice(0, 2).join(', ');
+      const assessment = assessmentMethods[index % assessmentMethods.length];
+      const reflection = `Were learners able to ${conceptObj.concept.toLowerCase()}?`;
       
-      words.forEach(word => concepts.add(word));
+      content += `| Week ${weekNum} | Lesson ${lessonNum} | ${strand} | ${substrand} | ${slo} | ${experience} | ${question} | ${resource} | ${assessment} | ${reflection} |\n`;
     });
-
-    return Array.from(concepts);
-  }
-
-  /**
-   * ✅ Determine diagram type from SLO content
-   */
-  static determineDiagramTypeFromSLO(sloArray, learningArea) {
-    if (!sloArray || sloArray.length === 0) return 'educational_infographic';
     
-    const combinedSLO = sloArray.join(' ').toLowerCase();
-    const learningAreaLower = learningArea.toLowerCase();
-
-    if (learningAreaLower.includes('social')) {
-      if (combinedSLO.includes('map') || combinedSLO.includes('location')) return 'geographical_map';
-      if (combinedSLO.includes('weather') || combinedSLO.includes('climate')) return 'meteorological_chart';
-      if (combinedSLO.includes('population') || combinedSLO.includes('settlement')) return 'demographic_infographic';
-      if (combinedSLO.includes('government') || combinedSLO.includes('structure')) return 'organizational_chart';
-      if (combinedSLO.includes('historical') || combinedSLO.includes('timeline')) return 'historical_timeline';
-      return 'conceptual_infographic';
-    }
-
-    if (learningAreaLower.includes('science')) {
-      if (combinedSLO.includes('cell') || combinedSLO.includes('organism')) return 'biological_diagram';
-      if (combinedSLO.includes('energy') || combinedSLO.includes('force')) return 'physics_diagram';
-      if (combinedSLO.includes('chemical') || combinedSLO.includes('reaction')) return 'chemical_diagram';
-      if (combinedSLO.includes('ecosystem') || combinedSLO.includes('environment')) return 'ecological_diagram';
-      return 'scientific_illustration';
-    }
-
-    if (learningAreaLower.includes('math')) {
-      if (combinedSLO.includes('geometry') || combinedSLO.includes('shape')) return 'geometric_diagram';
-      if (combinedSLO.includes('algebra') || combinedSLO.includes('equation')) return 'algebraic_diagram';
-      if (combinedSLO.includes('graph') || combinedSLO.includes('chart')) return 'data_visualization';
-      return 'mathematical_illustration';
-    }
-
-    return 'educational_infographic';
-  }
-
-  /**
-   * ✅ Get generic diagram instructions (fallback)
-   */
-  static getGenericDiagramInstructions() {
-    return `
-CRITICAL DIAGRAM FORMAT INSTRUCTIONS:
-When you need to include a diagram, use this EXACT JSON format:
-
-[DIAGRAM:{
-  "description": "Detailed description for AI image generation (40+ words with specific visual elements)",
-  "caption": "Educational caption for students (Figure X: ...)",
-  "context": "Why this diagram is needed at this point",
-  "educationalPurpose": "What students should learn from this diagram",
-  "visualElements": ["specific element 1", "specific element 2", "specific element 3"],
-  "labels": ["label 1", "label 2", "label 3"]
-}]
-
-KEY RULES:
-1. Description must be 40+ words with SPECIFIC visual details
-2. Include ALL visual elements that should appear
-3. Specify ALL labels that should be on the diagram
-4. Use white background for printability
-5. Include maximum ${this.MAX_DIAGRAMS} strategically placed diagrams total
-6. Focus on the most important concepts that need visual explanation
-7. Avoid redundant or similar diagrams
-8. Include Kenyan context and examples
-`;
+    return content;
   }
 
   /**
@@ -408,8 +418,7 @@ KEY RULES:
       score: Math.max(0, score),
       issues: issues,
       quality: score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor',
-      sloCount: cbcEntry.slo?.length || 0,
-      hasDiagramPotential: (cbcEntry.slo?.length || 0) > 0
+      sloCount: cbcEntry.slo?.length || 0
     };
   }
 
@@ -437,13 +446,10 @@ KEY RULES:
    */
   static getConfig() {
     return {
-      maxDiagrams: this.MAX_DIAGRAMS,
       maxContentSize: this.MAX_CONTENT_SIZE,
       supportedTypes: Object.keys(this.generators),
       cacheSize: this.cbcCache.size,
       features: {
-        sloBasedDiagrams: true,
-        webReferences: true,
         linkedDocuments: true,
         contentOptimization: true
       }

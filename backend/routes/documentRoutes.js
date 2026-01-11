@@ -87,6 +87,30 @@ router.get('/diagrams/:filename', async (req, res) => {
   }
 });
 
+router.get('/breakdowns', async (req, res) => {
+  const { grade, term, strand, substrand, teacher } = req.query;
+  
+  const breakdowns = await Document.find({
+    type: 'Lesson Concept Breakdown',
+    grade,
+    term,
+    strand,
+    substrand,
+    teacher
+  }).select('_id substrand strand grade term createdAt content');
+  
+  // Extract concept count from content
+  const breakdownsWithCount = breakdowns.map(bd => ({
+    ...bd.toObject(),
+    conceptCount: (bd.content.match(/\|\s*Week\s*\d+/gi) || []).length
+  }));
+  
+  res.json({ breakdowns: breakdownsWithCount });
+});
+
+router.post('/generate-scheme-from-breakdown/:breakdownId', authenticate, documentController.generateSchemeFromBreakdown);
+router.post('/generate-lesson-plan-from-breakdown/:breakdownId', authenticate, documentController.generateLessonPlanFromBreakdown);
+
 // More specific routes before generic :id routes
 router.get('/:schoolCode/count', documentController.getDocCountOfSchool);
 router.get('/:schoolCode/downloads/count', documentController.getNumberOfDownloadsByTeachers);
@@ -126,5 +150,6 @@ router.delete('/:id', documentController.deleteDocument);
 
 // Generic :id route - MUST BE LAST
 router.get('/:id', documentController.fetchGeneratedDocument);
+
 
 module.exports = router;

@@ -1,4 +1,4 @@
-// LessonNotesGenerator.js - WITH MANDATORY DIAGRAM PLACEHOLDERS
+// LessonNotesGenerator.js - NO DIAGRAMS VERSION
 
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
@@ -11,17 +11,13 @@ class LessonNotesGenerator extends BaseDocumentGenerator {
     const startTime = Date.now();
     
     try {
-      console.log(`[${this.type}] Starting generation with local image library`);
+      console.log(`[${this.type}] Starting CBC-aligned generation (NO DIAGRAMS)`);
       
-      // Validate inputs
       const safeRequestData = this.validateAndSanitizeRequestData(requestData, cbcEntry);
-      
-      // Create base prompt
       const basePrompt = this.createPrompt(safeRequestData, cbcEntry);
       
       console.log(`[${this.type}] Prompt created (${basePrompt.length} chars)`);
       
-      // Generate with prompt
       const aiContent = await this.generateWithRetry(basePrompt, 3);
       
       if (!aiContent || aiContent.length < 100) {
@@ -39,336 +35,279 @@ class LessonNotesGenerator extends BaseDocumentGenerator {
   }
 
   createPrompt(requestData, cbcEntry) {
-    // ✅ CRITICAL FIX: Ensure grade exists at the VERY START
     if (!requestData.grade) {
       console.warn('[LessonNotesGenerator] ⚠️ WARNING: grade is undefined, using fallback');
       requestData.grade = cbcEntry?.grade || 'Grade 7';
     }
 
-    // ✅ CRITICAL FIX: Create safe variables IMMEDIATELY
     const safeGrade = requestData.grade || cbcEntry?.grade || 'Grade 7';
     const safeLearningArea = requestData.learningArea || cbcEntry?.learningArea || 'General';
     const safeStrand = requestData.strand || cbcEntry?.strand || 'General Strand';
     const safeSubstrand = requestData.substrand || cbcEntry?.substrand || 'General Substrand';
     
     const { 
-      school, 
-      teacherName, 
-      term,
-      learningConcepts,
-      sourceLessonConceptId
+      school, teacherName, term, learningConcepts, ageRange, lessonDuration 
     } = requestData;
 
-    console.log('[LessonNotesGenerator] Generating CBC lesson notes with LOCAL IMAGE LIBRARY');
-    
-    const sloList = cbcEntry?.slo || cbcEntry?.specificLearningOutcomes || [];
-    const learningExperiences = cbcEntry?.learningExperiences || cbcEntry?.suggestedLearningActivities || [];
+    const sloList = cbcEntry?.slo || [];
+    const learningExperiences = cbcEntry?.learningExperiences || [];
     const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
     const coreCompetencies = cbcEntry?.coreCompetencies || [];
     const values = cbcEntry?.values || [];
+    const pertinentIssues = cbcEntry?.pertinentIssues || [];
+    const lifeSkills = cbcEntry?.lifeSkills || [];
+    const assessmentRubrics = cbcEntry?.assessment || [];
+    const resources = cbcEntry?.resources || [];
     const noOfLessons = cbcEntry?.noOfLessons || 'Not specified';
 
     const hasLearningConcepts = learningConcepts && learningConcepts.length > 0;
 
-    let conceptGuidance = '';
-    if (hasLearningConcepts) {
-      conceptGuidance = `
-📋 WEEKLY PROGRESSION (${learningConcepts.length} weeks):
-${learningConcepts.map((c, i) => `${i+1}. ${c.week}: ${c.concept}`).join('\n')}
+    return `Generate comprehensive CBC Lesson Notes following official KICD curriculum structure.
 
-Create comprehensive content for EACH week above.
-`;
-    }
+═══════════════════════════════════════════════════════════════════
+📚 OFFICIAL CBC CURRICULUM INFORMATION
+═══════════════════════════════════════════════════════════════════
 
-    // ✅ DIAGRAM INSTRUCTIONS - Number of diagrams based on concepts
-    const maxDiagrams = hasLearningConcepts ? Math.min(learningConcepts.length, 5) : 2;
+SCHOOL: ${school}
+FACILITATOR: ${teacherName}
+GRADE: ${safeGrade} (Age: ${ageRange})
+LEARNING AREA: ${safeLearningArea}
+STRAND: ${safeStrand}
+SUB-STRAND: ${safeSubstrand}
+TERM: ${term || 'Term 1'}
+DURATION: ${noOfLessons}
+LESSON DURATION: ${lessonDuration} minutes per lesson
 
-    // ✅ CRITICAL: SUPER MANDATORY DIAGRAM PLACEHOLDER INSTRUCTIONS
-    return `Generate professional CBC Lesson Notes with MANDATORY DIAGRAM PLACEHOLDERS.
+═══════════════════════════════════════════════════════════════════
+🎯 OFFICIAL CBC FRAMEWORK ELEMENTS
+═══════════════════════════════════════════════════════════════════
 
-DOCUMENT INFORMATION:
-Grade: ${safeGrade}
-Subject: ${safeLearningArea}
-Strand: ${safeStrand}
-Sub-strand: ${safeSubstrand}
-Term: ${term || 'Term 1'}
-Duration: ${noOfLessons} lessons
-School: ${school || 'Kenyan School'}
-Teacher: ${teacherName || 'Teacher'}
+**SPECIFIC LEARNING OUTCOMES (SLOs):**
+By the end of the sub-strand, the learner should be able to:
 
-${conceptGuidance}
+${sloList.map((slo, idx) => `${String.fromCharCode(97 + idx)}) ${slo}`).join('\n')}
 
-SPECIFIC LEARNING OUTCOMES (SLOs):
-${sloList.length > 0 ? sloList.map((s, i) => `${i+1}. ${s}`).join('\n') : '- Master core concepts\n- Apply to real contexts\n- Develop critical thinking'}
+**SUGGESTED LEARNING EXPERIENCES:**
+${learningExperiences.length > 0 ? learningExperiences.map((exp) => `• ${exp}`).join('\n') : '• Interactive activities\n• Hands-on exploration\n• Practical applications'}
 
-KEY INQUIRY QUESTIONS:
-${keyInquiryQuestions.length > 0 ? keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n') : '- What do we need to learn?\n- How does this apply?\n- Why is this important?'}
+**KEY INQUIRY QUESTIONS:**
+${keyInquiryQuestions.length > 0 ? keyInquiryQuestions.map((q, idx) => `${idx+1}. ${q}`).join('\n') : '1. What do we need to learn?\n2. How does this apply to our lives?\n3. Why is this important?'}
 
----
+**CORE COMPETENCIES DEVELOPED:**
+${coreCompetencies.length > 0 ? coreCompetencies.join(', ') : 'Communication, Critical thinking, Creativity, Collaboration, Learning to learn'}
 
-🖼️ CRITICAL REQUIREMENT: DIAGRAM PLACEHOLDER FORMAT (ABSOLUTELY MANDATORY)
+**VALUES:**
+${values.length > 0 ? values.join(', ') : 'Unity, Responsibility, Respect, Patriotism, Peace'}
 
-YOU **MUST** INCLUDE **EXACTLY ${maxDiagrams} DIAGRAM PLACEHOLDERS** IN YOUR RESPONSE.
+**LINK TO PCIs (Pertinent & Contemporary Issues):**
+${pertinentIssues.length > 0 ? pertinentIssues.join(', ') : 'Citizenship, Life skills'}
 
-**THIS IS NOT OPTIONAL. YOU MUST INCLUDE ALL ${maxDiagrams} DIAGRAM PLACEHOLDERS.**
+${lifeSkills.length > 0 ? `**LIFE SKILLS:**
+${lifeSkills.join(', ')}` : ''}
 
-**DIAGRAM PLACEHOLDER FORMAT** (COPY THIS EXACT STRUCTURE):
+**SUGGESTED LEARNING RESOURCES:**
+${resources.length > 0 ? resources.join(', ') : 'Textbooks, realia, ICT devices, charts, locally available materials'}
 
-[DIAGRAM:{
-  "description": "Brief description of what visual is needed",
-  "caption": "Figure X: Descriptive caption for students",
-  "week": "Week X",
-  "conceptNumber": X,
-  "educationalPurpose": "Explain why this visual helps students"
-}]
+**SUGGESTED ASSESSMENT:**
+${assessmentRubrics.length > 0 ? 'Oral questions, observation, portfolio, practical tasks' : 'Observation, questioning, portfolio'}
 
-**MANDATORY PLACEMENT INSTRUCTIONS:**
-${hasLearningConcepts ? `
-You MUST place ONE diagram placeholder after explaining EACH of these ${maxDiagrams} concepts:
+═══════════════════════════════════════════════════════════════════
+🚫 CRITICAL: NO DIAGRAMS OR IMAGES
+═══════════════════════════════════════════════════════════════════
 
-${learningConcepts.slice(0, maxDiagrams).map((c, i) => `
-DIAGRAM ${i+1} REQUIREMENT:
-- Concept: "${c.concept}"
-- Week: ${c.week}
-- Place after: The main explanation paragraph for this concept
-- Example:
-  
-[DIAGRAM:{
-  "description": "diagram showing ${c.concept.substring(0, 50)}",
-  "caption": "Figure ${i+1}: ${c.concept.substring(0, 60)}",
-  "week": "${c.week}",
-  "conceptNumber": ${i+1},
-  "educationalPurpose": "Helps students visualize ${c.concept.substring(0, 50)}"
-}]
-`).join('\n')}
+**IMPORTANT:** Do NOT include any diagram placeholders, image references, or [DIAGRAM:...] tags in your response.
 
-` : `
-You MUST place ${maxDiagrams} diagram placeholders:
-- DIAGRAM 1: After introducing fundamental concepts (20-30% through content)
-- DIAGRAM 2: When explaining complex relationships (60-70% through content)
-`}
+This document should be PURE TEXT ONLY with:
+- Clear written explanations
+- Detailed descriptions
+- Step-by-step instructions
+- Examples described in words
 
-⚠️ **VALIDATION CHECKLIST - YOU MUST COMPLETE THIS BEFORE OUTPUTTING:**
+═══════════════════════════════════════════════════════════════════
+📝 LESSON NOTES STRUCTURE (OFFICIAL CBC FORMAT)
+═══════════════════════════════════════════════════════════════════
 
-Before you generate your response, verify:
-☐ I have included EXACTLY ${maxDiagrams} diagram placeholders
-☐ Each placeholder uses the EXACT JSON format shown above
-☐ Each placeholder has all required fields (description, caption, week, conceptNumber, educationalPurpose)
-☐ Placeholders are inserted at natural points in the content
-☐ All placeholders are complete and properly formatted
-☐ I have NOT used any markdown formatting (**bold**, *italic*, etc.) in concept names or figure captions
-
-**CRITICAL: DO NOT use markdown formatting (** or *) anywhere in learning concept names, figure captions, or headings. Always use plain text only.**
-
-**IF YOU CANNOT COMPLETE THIS CHECKLIST, RETRY YOUR GENERATION.**
-
----
-
-GENERATE LESSON NOTES IN THIS FORMAT:
+Generate following this EXACT CBC-aligned structure (TEXT ONLY):
 
 # ${safeSubstrand.toUpperCase()}
 *${safeLearningArea} - ${safeGrade} - ${term || 'Term 1'}*
 
 ---
 
-## INTRODUCTION
+## 📋 CURRICULUM INFORMATION
 
-[Write 2-3 engaging paragraphs (200-250 words) that:]
-- Hook students' interest with a relatable question or scenario
-- Explain why this topic matters in everyday Kenyan life
-- Preview what students will learn
-- Connect to students' prior knowledge
-
----
-
-## SPECIFIC LEARNING OUTCOMES
-
-By the end of this lesson, the learner should be able to:
-
-${sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n')}
+- **Strand:** ${safeStrand}
+- **Sub-strand:** ${safeSubstrand}
+- **Duration:** ${noOfLessons}
+- **Grade:** ${safeGrade}
+- **Age Range:** ${ageRange}
+- **Term:** ${term || 'Term 1'}
+- **Lesson Duration:** ${lessonDuration} minutes per lesson
 
 ---
 
-## KEY CONCEPTS AND DEFINITIONS
+## 📖 INTRODUCTION
 
-**Term 1:** [Clear definition in 1-2 sentences]  
-*Example:* [Kenyan example showing the term in use]
+[Write 3 engaging paragraphs (300 words total) - PURE TEXT, NO DIAGRAMS]
 
-**Term 2:** [Clear definition in 1-2 sentences]  
-*Example:* [Kenyan example showing the term in use]
+---
 
-[Include 8-10 key terms total]
+## 🎯 SPECIFIC LEARNING OUTCOMES
+
+By the end of the sub-strand, the learner should be able to:
+
+${sloList.map((slo, idx) => `${String.fromCharCode(97 + idx)}) ${slo}`).join('\n')}
+
+---
+
+## 🔑 KEY VOCABULARY
+
+[Define 8-10 key terms with Kenyan examples - DESCRIBED IN WORDS, NO IMAGES]
 
 ---
 
 ${hasLearningConcepts ? `
-## DETAILED CONTENT BY WEEK
+## 📚 CONTENT BY LEARNING CONCEPT
 
-${learningConcepts.slice(0, maxDiagrams).map((c, i) => `
+${learningConcepts.slice(0, 5).map((c, conceptIdx) => `
 ### ${c.week.toUpperCase()}: ${c.concept}
 
+**SLO Focus:** [Which SLO (a, b, c, d) this concept addresses]
+
 **Learning Focus:**  
-[1-2 sentences explaining what students will learn this week]
+[2-3 sentences explaining what students will master and why it's important]
 
-**Core Content:**
+**Main Content:**
 
-[Write 250-300 words explaining this concept thoroughly, including:]
-- What it is (definition and explanation)
-- Why it's important
-- How it works or applies
-- Connection to Kenyan context with specific examples
+[Write 400-450 words of detailed, clear explanation - PURE TEXT]
 
-[DIAGRAM:{
-  "description": "${c.concept.substring(0, 100)}",
-  "caption": "Figure ${i+1}: ${c.concept.substring(0, 80)}",
-  "week": "${c.week}",
-  "conceptNumber": ${i+1},
-  "educationalPurpose": "Visual aid for ${c.concept.substring(0, 60)}"
-}]
+**What it is:**
+- Clear definition appropriate for ${safeGrade} (age ${ageRange})
+- Break complex ideas into simple parts
+- Use language young learners understand
 
-**Key Points:**
-- [Important point 1 with brief explanation]
-- [Important point 2 with brief explanation]
-- [Important point 3 with brief explanation]
-- [Important point 4 with brief explanation]
+**Why it matters:**
+- Importance for Kenyan students
+- Connection to Kenyan national development, Vision 2030, or community
+- Relevance to students' current and future lives
 
-**Real-World Examples:**
+**How it works:**
+- Step-by-step explanation or process DESCRIBED IN WORDS
+- Cause and effect relationships
+- Key principles or mechanisms
+- Connection to ${safeLearningArea}
 
-1. **Example 1:** [Kenyan example from daily life]
-2. **Example 2:** [Kenyan example from agriculture/industry]
-3. **Example 3:** [Kenyan example relevant to students' community]
+**Kenyan Context:**
+- Specific examples from Kenyan agriculture, industry, or economy
+- Local applications students can observe in their communities
+- Connection to Kenyan culture, traditions, or daily life
+- Examples from different regions of Kenya
 
-**Practical Application:**
+**Key Points to Remember:**
 
-[Paragraph explaining how students can apply this knowledge in their lives]
+- ✓ [First important point with explanation - 2 sentences]
+- ✓ [Second important point with explanation - 2 sentences]
+- ✓ [Third important point with explanation - 2 sentences]
+- ✓ [Fourth important point with explanation - 2 sentences]
+
+**Suggested Learning Experiences (from CBC):**
+
+${learningExperiences.slice(0, 2).map((exp, expIdx) => `
+**Experience ${expIdx + 1}:** ${exp}
+- **Procedure:** [How to implement this in class - 3-4 steps DESCRIBED IN WORDS]
+- **Materials:** [What's needed]
+- **Expected Outcome:** [What students achieve]
+`).join('\n')}
+
+**Real-World Kenyan Examples:**
+
+1. **Agricultural Application:** [How this concept applies to Kenyan farming - 3 sentences, NO DIAGRAMS]
+
+2. **Economic/Industrial Context:** [How this relates to Kenyan industries - 3 sentences, NO DIAGRAMS]
+
+3. **Community & Daily Life:** [How students see this in their communities - 3 sentences, NO DIAGRAMS]
 
 ---
 `).join('\n')}
 
 ` : `
-## CORE CONTENT
+## 📚 CORE CONTENT
 
-### Part 1: [Main Topic 1]
-
-[Detailed explanation with Kenyan examples - 300+ words]
-
-[DIAGRAM:{
-  "description": "visualization of main concept in Part 1",
-  "caption": "Figure 1: [Topic 1]",
-  "week": "Week 1",
-  "conceptNumber": 1,
-  "educationalPurpose": "Helps students understand the fundamental concept"
-}]
-
-### Part 2: [Main Topic 2]
-
-[Detailed explanation with Kenyan examples - 300+ words]
-
-[DIAGRAM:{
-  "description": "visualization of main concept in Part 2",
-  "caption": "Figure 2: [Topic 2]",
-  "week": "Week 2",
-  "conceptNumber": 2,
-  "educationalPurpose": "Clarifies complex relationships in the topic"
-}]
+[Generate 3 main content sections with detailed explanations - ALL TEXT, NO DIAGRAMS]
 `}
 
 ---
 
-## PRACTICAL APPLICATIONS IN KENYA
+## 🌍 KENYAN CONTEXT & APPLICATIONS
 
-### 1. Agriculture and Food Production
-[Explain how this topic relates to Kenyan farming - 150 words]
-
-### 2. Industry and Economic Development
-[Connect to Kenyan industries and economy - 150 words]
-
-### 3. Daily Life and Community
-[Show relevance to everyday Kenyan life - 150 words]
-
-### 4. Career Opportunities
-**Careers related to ${safeSubstrand}:**
-- [Career 1]: [Brief description]
-- [Career 2]: [Brief description]
-- [Career 3]: [Brief description]
+[4 sections: Agriculture, Industry, Community, Careers - ALL DESCRIBED IN WORDS, NO IMAGES]
 
 ---
 
-## LEARNING ACTIVITIES
+## 🎨 LEARNING ACTIVITIES
 
-### Activity 1: [Activity Name]
-**Objective:** [What students will learn]  
-**Duration:** [Time needed]  
-**Materials:** [List materials]  
+${learningExperiences.slice(0, 3).map((exp, idx) => `
+### Activity ${idx + 1}: ${exp}
+
+**Learning Objective:** [What specific skill or knowledge students will gain]  
+**Duration:** ${lessonDuration === 30 ? '20-25' : lessonDuration === 35 ? '25-30' : '30-35'} minutes  
+**Group Size:** [Individual / Pairs / Groups of 4-5 / Whole class]
+
+**Materials Required:**
+- [List materials - NO IMAGES, just descriptions]
+
 **Procedure:**
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
+[Step-by-step instructions DESCRIBED IN WORDS - NO DIAGRAMS]
 
 **Expected Outcome:** [What students should achieve]
 
-[Repeat for Activities 2 and 3]
+**Assessment:** [How to check if students achieved the objective]
+
+---
+`).join('\n')}
 
 ---
 
-## ASSESSMENT
+## ❓ KEY INQUIRY QUESTIONS
 
-### Formative Assessment
-[Methods for ongoing assessment during lessons]
-
-### Summative Assessment Questions
-
-**Knowledge and Understanding (Remember/Understand):**
-1. [Question requiring recall]
-2. [Question requiring explanation]
-3. [Question testing comprehension]
-
-**Application and Analysis (Apply/Analyze):**
-4. [Question requiring application to new situation]
-5. [Question requiring comparison or analysis]
-
-**Evaluation and Creation (Evaluate/Create):**
-6. [Question requiring evaluation or judgment]
-7. [Question requiring creation or design]
+${keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n')}
 
 ---
 
-## RESOURCES AND MATERIALS
+## 📊 ASSESSMENT STRATEGIES
 
-### Required Materials
-- [Material 1]
-- [Material 2]
-- [Material 3]
-
-### Recommended Textbooks
-- [CBC-approved textbook 1 with page numbers]
-- [CBC-approved textbook 2 with page numbers]
+[Formative and Summative assessment - DESCRIBED IN WORDS, NO VISUAL AIDS]
 
 ---
 
-## SUMMARY
+## 📚 RESOURCES AND MATERIALS
 
-[Write 3-4 comprehensive paragraphs (150-200 words total) that:]
-- Recap all major concepts covered
-- Emphasize key takeaways
-- Reinforce importance of this knowledge
-- Connect to future learning
+### Suggested Learning Resources (From CBC):
+${resources.length > 0 ? resources.map(r => `- ${r}`).join('\n') : '- Textbooks\n- Realia\n- Locally available materials'}
 
 ---
 
-*These lesson notes align with the Kenyan Competency Based Curriculum.*
+## 🎓 CBC FRAMEWORK INTEGRATION
+
+[Core Competencies, Values, PCIs - ALL TEXT, NO DIAGRAMS]
 
 ---
 
-FINAL REMINDER BEFORE YOU START GENERATING:
+## 📝 SUMMARY
 
-⚠️ **YOU MUST INCLUDE EXACTLY ${maxDiagrams} DIAGRAM PLACEHOLDERS**
-⚠️ **EACH MUST USE THE [DIAGRAM:{...}] FORMAT**
-⚠️ **DO NOT FORGET THIS REQUIREMENT**
+[Write 4 comprehensive paragraphs (300 words total) - PURE TEXT]
 
-If you generate content without ${maxDiagrams} diagram placeholders, your response will be rejected and you will need to regenerate it.
+---
 
-Generate the complete CBC lesson notes now with ALL ${maxDiagrams} mandatory diagram placeholders.`;
+*These lesson notes align with the Kenyan Competency Based Curriculum (CBC) Framework*  
+*Based on KICD Curriculum Designs - ${safeGrade}*  
+*Generated: [DATE] | Sub-strand Duration: ${noOfLessons}*
+
+---
+
+⚠️ CRITICAL REMINDER: Your entire response should be PURE TEXT with NO diagram placeholders, NO [DIAGRAM:...] tags, NO image references. Describe everything in words.
+
+Generate the complete, CBC-aligned lesson notes now (TEXT ONLY).`;
   }
 
   escapeForPrompt(text) {

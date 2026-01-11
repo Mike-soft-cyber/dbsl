@@ -5,7 +5,7 @@ import TableView from './TableView';
 import MarkdownView from './MarkdownView';
 import { extractHeaderAndBody, enhanceContentWithMarkdown, expandSLOs } from '../../utils/contentFormatter';
 
-const DocumentContent = ({ content, documentType, cbcEntry, documentId, learningArea }) => {
+const DocumentContent = ({ content, documentType, cbcEntry, documentId, learningArea, strand, substrand }) => {
   // Memoize the parsed content to prevent unnecessary re-parsing
   const parsedContent = useMemo(() => {
     if (!content) return { type: 'empty', data: null };
@@ -63,23 +63,28 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
   }, [content]);
 
   // If table parsing succeeded, show the table
-  if (parsedContent.type === 'table' && parsedContent.data) {
-    return (
-      <>
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 text-sm mb-2">
-            <FileText className="h-4 w-4 text-black" />
-            <span className="text-black">Structured Educational Content</span>
-          </div>
-          <p className="text-black text-sm">
-            This content has been automatically formatted into a structured table format 
-            based on the Kenyan Competency Based Curriculum guidelines.
-          </p>
+ if (parsedContent.type === 'table' && parsedContent.data) {
+  return (
+    <>
+      <div className="mb-6">
+        <div className="flex items-center space-x-2 text-sm mb-2">
+          <FileText className="h-4 w-4 text-black" />
+          <span className="text-black">Structured Educational Content</span>
         </div>
-        <TableView data={parsedContent.data} />
-      </>
-    );
-  }
+        <p className="text-black text-sm">
+          This content has been automatically formatted into a structured table format 
+          based on the Kenyan Competency Based Curriculum guidelines.
+        </p>
+      </div>
+      <TableView 
+        data={parsedContent.data} 
+        strand={strand}
+        substrand={substrand}
+        cbcEntry={cbcEntry}
+      />
+    </>
+  );
+}
 
   // Fallback to markdown processing
   return (

@@ -3,14 +3,149 @@ const CBCEntry = require('../models/CbcEntry');
 // Create a new CBC entry
 exports.createCbcEntry = async (req, res) => {
   try {
-    const { grade, learningArea, strand, substrand, slo, learningExperiences, keyInquiryQuestions, resources, assessment, reflection, noOfLessons } = req.body;
-    const entry = new CBCEntry({ grade, learningArea, strand, substrand, slo, learningExperiences, keyInquiryQuestions, resources, assessment, reflection, noOfLessons });
-    console.log("Received:", req.body);
+    const { 
+      grade, learningArea, strand, substrand, 
+      slo, learningExperiences, keyInquiryQuestions, 
+      resources, assessment, reflection, noOfLessons,
+      // ✅ MAKE SURE THESE ARE HERE:
+      ageRange, lessonDuration, lessonsPerWeek,
+      coreCompetencies, values, pertinentIssues, 
+      linkToOtherSubjects, communityLinkActivities,
+      learningOutcomesSummary
+    } = req.body;
+    
+    console.log('📥 Creating CBC Entry with data:', {
+      grade, learningArea, strand, substrand,
+      ageRange, lessonDuration, lessonsPerWeek,
+      coreCompetencies, values, pertinentIssues
+    });
+    
+    // Process arrays
+    const processedCoreCompetencies = Array.isArray(coreCompetencies) ? coreCompetencies : [];
+    const processedValues = Array.isArray(values) ? values : [];
+    const processedPertinentIssues = Array.isArray(pertinentIssues) ? pertinentIssues : [];
+    const processedLinkToOtherSubjects = Array.isArray(linkToOtherSubjects) ? linkToOtherSubjects : [];
+    const processedCommunityLinkActivities = Array.isArray(communityLinkActivities) ? communityLinkActivities : [];
+
+    const entry = new CBCEntry({ 
+      grade, 
+      learningArea, 
+      strand, 
+      substrand, 
+      slo, 
+      learningExperiences, 
+      keyInquiryQuestions, 
+      resources, 
+      assessment, 
+      reflection, 
+      noOfLessons,
+      // ✅ CRITICAL: These must be here
+      ageRange: ageRange || undefined,
+      lessonDuration: lessonDuration ? parseInt(lessonDuration) : undefined,
+      lessonsPerWeek: lessonsPerWeek ? parseInt(lessonsPerWeek) : undefined,
+      coreCompetencies: processedCoreCompetencies,
+      values: processedValues,
+      pertinentIssues: processedPertinentIssues,
+      linkToOtherSubjects: processedLinkToOtherSubjects,
+      communityLinkActivities: processedCommunityLinkActivities,
+      learningOutcomesSummary: learningOutcomesSummary || undefined
+    });
+    
     await entry.save();
+    console.log('✅ CBC Entry created successfully:', entry._id);
+    console.log('✅ Saved data:', entry); // ADD THIS LINE TO SEE WHAT'S SAVED
     res.status(201).json(entry);
   } catch (error) {
-    console.error("❌ Backend error while saving CBC entry:", error);
-    res.status(500).json({ message: 'Error creating entry', error });
+    console.error("❌ Error creating CBC entry:", error);
+    res.status(500).json({ message: 'Error creating entry', error: error.message });
+  }
+};
+
+// Update a CBC entry
+exports.updateCbcEntry = async (req, res) => {
+  try {
+    const {
+      grade, learningArea, strand, substrand, noOfLessons,
+      slo, learningExperiences, keyInquiryQuestions,
+      resources, reflection, assessment,
+      ageRange, lessonDuration, lessonsPerWeek,
+      coreCompetencies, values, pertinentIssues,
+      linkToOtherSubjects, communityLinkActivities,
+      learningOutcomesSummary
+    } = req.body;
+
+    console.log('📝 Updating CBC Entry:', req.params.id);
+    console.log('📥 Update data received:', {
+      ageRange, lessonDuration, lessonsPerWeek,
+      coreCompetencies, values, pertinentIssues
+    });
+
+    // 🛠️ Build update object
+    const updateData = {
+      grade,
+      learningArea,
+      strand,
+      substrand,
+      slo,
+      learningExperiences,
+      keyInquiryQuestions,
+      resources,
+      reflection,
+      assessment,
+    };
+
+    // Handle noOfLessons (can be null)
+    if (noOfLessons === "" || noOfLessons === null) {
+      updateData.noOfLessons = null;
+    } else if (noOfLessons !== undefined) {
+      updateData.noOfLessons = noOfLessons;
+    }
+
+    // ✅ Add curriculum config fields
+    if (ageRange !== undefined) updateData.ageRange = ageRange;
+    
+    if (lessonDuration === "" || lessonDuration === null) {
+      updateData.lessonDuration = null;
+    } else if (lessonDuration !== undefined) {
+      updateData.lessonDuration = parseInt(lessonDuration);
+    }
+    
+    if (lessonsPerWeek === "" || lessonsPerWeek === null) {
+      updateData.lessonsPerWeek = null;
+    } else if (lessonsPerWeek !== undefined) {
+      updateData.lessonsPerWeek = parseInt(lessonsPerWeek);
+    }
+
+    // ✅ Add KICD fields (arrays)
+    if (coreCompetencies !== undefined) updateData.coreCompetencies = coreCompetencies;
+    if (values !== undefined) updateData.values = values;
+    if (pertinentIssues !== undefined) updateData.pertinentIssues = pertinentIssues;
+    if (linkToOtherSubjects !== undefined) updateData.linkToOtherSubjects = linkToOtherSubjects;
+    if (communityLinkActivities !== undefined) updateData.communityLinkActivities = communityLinkActivities;
+    if (learningOutcomesSummary !== undefined) updateData.learningOutcomesSummary = learningOutcomesSummary;
+
+    console.log('📤 Final update data:', updateData);
+
+    const updated = await CBCEntry.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      console.error('❌ Entry not found:', req.params.id);
+      return res.status(404).json({ message: "Entry not found" });
+    }
+
+    console.log('✅ CBC Entry updated successfully');
+    res.json(updated);
+  } catch (error) {
+    console.error("❌ Error updating CBC Entry:", error);
+    res.status(500).json({ 
+      message: "Error updating entry", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -65,47 +200,6 @@ exports.getSubstrandsByStrand = async (req, res) => {
     res.json(substrands);
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
-  }
-};
-
-
-// Update a CBC entry
-exports.updateCbcEntry = async (req, res) => {
-  try {
-    let {
-      grade, learningArea, strand, substrand, noOfLessons,
-      slo, learningExperiences, keyInquiryQuestions,
-      resources, reflection, assessment
-    } = req.body;
-
-    // 🛠️ Sanitize noOfLessons
-    if (noOfLessons === "" || noOfLessons === null) {
-      noOfLessons = undefined; // prevents CastError
-    }
-
-    const updated = await CBCEntry.findByIdAndUpdate(
-      req.params.id,
-      {
-        grade,
-        learningArea,
-        strand,
-        substrand,
-        noOfLessons,
-        slo,
-        learningExperiences,
-        keyInquiryQuestions,
-        resources,
-        reflection,
-        assessment,
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!updated) return res.status(404).json({ message: "Entry not found" });
-    res.json(updated);
-  } catch (error) {
-    console.error("❌ Error updating CBC Entry:", error); // <— log real reason
-    res.status(500).json({ message: "Error updating entry", error: error.message });
   }
 };
 

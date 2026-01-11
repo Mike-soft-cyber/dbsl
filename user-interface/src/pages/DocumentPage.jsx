@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, BookOpen, Clock, Users, Target, Download, Printer } from "lucide-react";
 import DocumentContent from "../components/document/DocumentContent";
 import LinkedDocumentButton from "../components/document/LinkedDocumentButton";
+import GenerateLessonPlanButton from "@/components/document/GenerateLessonPlanButton";
+import GenerateSchemeButton from "@/components/document/GenerateSchemeButton";
 
 export default function DocumentPage() {
   const { id } = useParams();
@@ -13,7 +15,6 @@ export default function DocumentPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [actionTriggered, setActionTriggered] = useState(false);
-  const printRef = useRef();
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -48,43 +49,6 @@ export default function DocumentPage() {
       setTimeout(() => setActionTriggered(false), 2000);
     }
   };
-
-  const sanitizeElementStyles = (element) => {
-  const stylesheets = Array.from(window.document.styleSheets);
-  const disabledSheets = [];
-  
-  stylesheets.forEach((sheet) => {
-    try {
-      const rules = Array.from(sheet.cssRules || sheet.rules || []);
-      const hasProblematicColors = rules.some(rule => {
-        const text = rule.cssText || '';
-        return text.includes('oklch') || 
-               text.includes('oklab') || 
-               text.includes('lch') || 
-               text.includes('lab') ||
-               text.includes('color-mix') ||
-               text.includes('hsl(var(');
-      });
-      
-      if (hasProblematicColors) {
-        sheet.disabled = true;
-        disabledSheets.push(sheet);
-        console.log('[PDF] Disabled problematic stylesheet');
-      }
-    } catch (e) {
-      // Skip CORS-protected stylesheets
-      console.warn('[PDF] Could not access stylesheet:', e.message);
-    }
-  });
-  
-  // Return cleanup function
-  return () => {
-    disabledSheets.forEach(sheet => {
-      sheet.disabled = false;
-    });
-    console.log('[PDF] Re-enabled', disabledSheets.length, 'stylesheets');
-  };
-};
 
   const trackDownload = async () => {
   const userData = JSON.parse(localStorage.getItem('userData'));
@@ -159,156 +123,6 @@ const handleDownloadPDF = async () => {
       setActionTriggered(false);
     }, 2000);
   }
-};
-
-// Enhanced PDF-compatible styles with table fixes
-const addPDFCompatibleStylesWithTableFixes = () => {
-  const styleId = 'pdf-compatible-styles';
-  let existingStyle = window.document.getElementById(styleId);
-  
-  if (existingStyle) {
-    return existingStyle;
-  }
-  
-  const style = window.document.createElement('style');
-  style.id = styleId;
-  style.textContent = `
-    /* Force simple colors for PDF mode */
-    .pdf-mode * {
-      color: #000000 !important;
-      background-color: transparent !important;
-      background-image: none !important;
-      border-color: #000000 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-    }
-    
-    /* White backgrounds for specific elements */
-    .pdf-mode,
-    .pdf-mode .bg-white,
-    .pdf-mode table {
-      background-color: #ffffff !important;
-    }
-    
-    /* Table-specific styles */
-    .pdf-mode table {
-      width: 100% !important;
-      border-collapse: collapse !important;
-      page-break-inside: auto !important;
-      border: 2px solid #000000 !important;
-      margin: 0 !important;
-    }
-    
-    .pdf-mode thead {
-      display: table-header-group !important;
-      page-break-inside: avoid !important;
-      page-break-after: avoid !important;
-    }
-    
-    .pdf-mode tbody {
-      display: table-row-group !important;
-    }
-    
-    .pdf-mode tr {
-      page-break-inside: avoid !important;
-      page-break-after: auto !important;
-      display: table-row !important;
-    }
-    
-    .pdf-mode th,
-    .pdf-mode td {
-      border: 1px solid #000000 !important;
-      padding: 8px 6px !important;
-      text-align: left !important;
-      vertical-align: top !important;
-      word-wrap: break-word !important;
-      overflow-wrap: break-word !important;
-      word-break: break-word !important;
-      hyphens: auto !important;
-      font-size: 11px !important;
-      line-height: 1.4 !important;
-      display: table-cell !important;
-      font-family: Arial, Helvetica, sans-serif !important;
-      page-break-inside: avoid !important;
-      color: #000000 !important;
-    }
-    
-    .pdf-mode th {
-      background-color: #e0e0e0 !important;
-      font-weight: bold !important;
-      text-align: center !important;
-      font-size: 12px !important;
-    }
-    
-    /* Alternating row colors for better readability */
-    .pdf-mode tbody tr:nth-child(even) {
-      background-color: #f5f5f5 !important;
-    }
-    
-    .pdf-mode tbody tr:nth-child(odd) {
-      background-color: #ffffff !important;
-    }
-    
-    /* Header and text elements */
-    .pdf-mode h1 {
-      font-size: 20px !important;
-      font-weight: bold !important;
-      margin: 10px 0 !important;
-      page-break-after: avoid !important;
-    }
-    
-    .pdf-mode h2 {
-      font-size: 16px !important;
-      font-weight: bold !important;
-      margin: 8px 0 !important;
-      page-break-after: avoid !important;
-    }
-    
-    .pdf-mode h3 {
-      font-size: 14px !important;
-      font-weight: bold !important;
-      margin: 6px 0 !important;
-    }
-    
-    .pdf-mode p,
-    .pdf-mode div:not(table div),
-    .pdf-mode span {
-      font-size: 11px !important;
-      line-height: 1.4 !important;
-    }
-    
-    /* Remove all decorative elements */
-    .pdf-mode [class*="shadow"],
-    .pdf-mode [class*="gradient"],
-    .pdf-mode [class*="rounded"] {
-      box-shadow: none !important;
-      border-radius: 0 !important;
-      background-image: none !important;
-    }
-    
-    /* Hide non-printable elements */
-    .pdf-mode .no-print {
-      display: none !important;
-    }
-    
-    /* Page break helpers */
-    .pdf-mode .page-break-before {
-      page-break-before: always !important;
-    }
-    
-    .pdf-mode .page-break-after {
-      page-break-after: always !important;
-    }
-    
-    .pdf-mode .page-break-avoid {
-      page-break-inside: avoid !important;
-    }
-  `;
-  
-  window.document.head.appendChild(style);
-  console.log('[PDF] Added PDF-compatible styles');
-  
-  return style;
 };
 
   const handleDownloadText = () => {
@@ -455,8 +269,13 @@ const addPDFCompatibleStylesWithTableFixes = () => {
 
   {/* Bottom Row: Linked Notes Card (only for Lesson Concept Breakdown) */}
   {document.type === 'Lesson Concept Breakdown' && (
+    <>
     <LinkedDocumentButton document={document} />
+    <GenerateSchemeButton document={document} />
+     <GenerateLessonPlanButton document={document} />
+     </>
   )}
+
 </div>
 
         {/* Print/Download Area */}
@@ -469,12 +288,14 @@ const addPDFCompatibleStylesWithTableFixes = () => {
             <Card className="shadow-sm border border-gray-200 bg-white rounded-lg">
               <CardContent className="p-6">
                 <DocumentContent 
-                  content={document.content}
-                  documentType={document.type}
-                  cbcEntry={cbcEntry}
-                  documentId={id}
-                  learningArea={document.subject}
-                />
+                 content={document.content}
+                 documentType={document.type}
+                 cbcEntry={cbcEntry}
+                 documentId={id}
+                 learningArea={document.subject}
+                 strand={document.strand}
+                 substrand={document.substrand}
+                 />
               </CardContent>
             </Card>
           </div>

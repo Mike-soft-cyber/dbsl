@@ -1,5 +1,5 @@
 import { React, useState, useEffect } from "react";
-import { School, Users, Calendar, BookOpen, GraduationCap, Clock, FileText, MoveLeft, User, ArrowLeft } from "lucide-react";
+import { School, Users, Calendar, BookOpen, GraduationCap, Clock, FileText, ArrowLeft, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,9 +22,14 @@ export default function CreateDocument() {
     grade: location.state?.grade || '',
     stream: location.state?.stream || '',
     strand: "",
-    substrand: "", // CHANGED: substrands -> substrand (singular)
+    substrand: "",
     school: "",
     teacher: "",
+    weeks: "", // ✅ Will auto-populate
+    lessonsPerWeek: "", // ✅ Will auto-populate
+    lessonDuration: "", // ✅ NEW
+    ageRange: "", // ✅ NEW
+    time: "" // ✅ NEW: Add time field
   });
 
   const [cbcEntries, setCbcEntries] = useState([]);
@@ -38,6 +43,11 @@ export default function CreateDocument() {
   const [filteredStreams, setFilteredStreams] = useState([]);
   const [schoolName, setSchoolName] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // ✅ NEW: State for curriculum configuration
+  const [levelConfig, setLevelConfig] = useState(null);
+  const [subjectConfig, setSubjectConfig] = useState(null);
+  const [autoCalculatedRows, setAutoCalculatedRows] = useState(0);
 
   // Handle input changes
   const handleChange = (field, value) => {
@@ -129,6 +139,97 @@ export default function CreateDocument() {
     fetchStreams();
   }, []);
 
+  // ✅ NEW: Fetch level configuration when grade changes
+  useEffect(() => {
+    const fetchLevelConfig = async () => {
+      if (!formData.grade) return;
+
+      try {
+        const res = await API.get(`/curriculum-config/level/${formData.grade}`);
+        setLevelConfig(res.data);
+        
+        // Auto-populate age range and lesson duration
+        setFormData(prev => ({
+          ...prev,
+          ageRange: res.data.ageRange,
+          lessonDuration: res.data.lessonDuration
+        }));
+
+        console.log('✅ Level config loaded:', res.data);
+      } catch (err) {
+        console.error('Error fetching level config:', err);
+      }
+    };
+
+    fetchLevelConfig();
+  }, [formData.grade]);
+
+  // ✅ NEW: Fetch subject configuration when grade and subject change
+  useEffect(() => {
+    const fetchSubjectConfig = async () => {
+      if (!formData.grade || !formData.learningArea) return;
+
+      try {
+        const res = await API.get(`/curriculum-config/subject-config/${formData.grade}/${formData.learningArea}`);
+        setSubjectConfig(res.data);
+        
+        // Auto-populate lessons per week
+        setFormData(prev => ({
+          ...prev,
+          lessonsPerWeek: res.data.lessonsPerWeek
+        }));
+
+        console.log('✅ Subject config loaded:', res.data);
+      } catch (err) {
+        console.warn('Subject config not found, using defaults');
+        // Use defaults if not found
+        setFormData(prev => ({
+          ...prev,
+          lessonsPerWeek: 5 // Default fallback
+        }));
+      }
+    };
+
+    fetchSubjectConfig();
+  }, [formData.grade, formData.learningArea]);
+
+  // ✅ NEW: Auto-calculate weeks based on term
+  useEffect(() => {
+    const fetchTermWeeks = async () => {
+      if (!formData.term) return;
+
+      try {
+        const res = await API.get(`/curriculum-config/term-weeks/${formData.term}`);
+        setFormData(prev => ({
+          ...prev,
+          weeks: res.data.weeks
+        }));
+
+        console.log(`✅ Term ${formData.term}: ${res.data.weeks} weeks`);
+      } catch (err) {
+        console.error('Error fetching term weeks:', err);
+        // Fallback to manual calculation
+        const termNumber = formData.term.replace('Term ', '');
+        const weekMap = { '1': 10, '2': 11, '3': 6 };
+        setFormData(prev => ({
+          ...prev,
+          weeks: weekMap[termNumber] || 10
+        }));
+      }
+    };
+
+    fetchTermWeeks();
+  }, [formData.term]);
+
+  // ✅ NEW: Calculate total rows when weeks and lessons per week are set
+  useEffect(() => {
+    if (formData.weeks && formData.lessonsPerWeek) {
+      const totalRows = parseInt(formData.weeks) * parseInt(formData.lessonsPerWeek);
+      setAutoCalculatedRows(totalRows);
+      console.log(`📊 Total rows: ${formData.weeks} weeks × ${formData.lessonsPerWeek} lessons = ${totalRows} rows`);
+    }
+  }, [formData.weeks, formData.lessonsPerWeek]);
+
   useEffect(() => {
     if (formData.grade) {
       const learningAreas = [
@@ -141,7 +242,7 @@ export default function CreateDocument() {
       setFilteredLearningAreas(learningAreas);
       handleChange("learningArea", "");
       handleChange("strand", "");
-      handleChange("substrand", ""); // CHANGED: substrands -> substrand
+      handleChange("substrand", "");
     }
   }, [formData.grade, cbcEntries]);
 
@@ -160,7 +261,7 @@ export default function CreateDocument() {
       ];
       setFilteredStrands(strands);
       handleChange("strand", "");
-      handleChange("substrand", ""); // CHANGED: substrands -> substrand
+      handleChange("substrand", "");
     }
   }, [formData.learningArea, formData.grade, cbcEntries]);
 
@@ -178,8 +279,8 @@ export default function CreateDocument() {
 
       setFilteredSubstrands(substrands);
 
-      if (!substrands.includes(formData.substrand)) { // CHANGED: substrands -> substrand
-        setFormData((prev) => ({ ...prev, substrand: "" })); // CHANGED: substrands -> substrand
+      if (!substrands.includes(formData.substrand)) {
+        setFormData((prev) => ({ ...prev, substrand: "" }));
       }
     }
   }, [formData.grade, formData.learningArea, formData.strand, cbcEntries]);
@@ -196,38 +297,42 @@ export default function CreateDocument() {
   }, [location.state]);
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    const requiredFields = [
-      'type',
-      'term',
-      'learningArea',
-      'grade',
-      'stream',
-      'strand',
-      'substrand', // CHANGED: substrands -> substrand
-      'teacher',
-      'school'
-    ];
+  const requiredFields = [
+    'type',
+    'term',
+    'learningArea',
+    'grade',
+    'stream',
+    'strand',
+    'substrand',
+    'teacher',
+    'school'
+  ];
 
-    for (let field of requiredFields) {
-      if (!formData[field]) {
-        toast.error(`Please select or fill the ${field}`);
-        setLoading(false);
-        return;
-      }
+  for (let field of requiredFields) {
+    if (!formData[field]) {
+      toast.error(`Please select or fill the ${field}`);
+      setLoading(false);
+      return;
     }
+  }
 
-    console.log("📤 Form data being sent to checkout:", formData); // Debug log
+  console.log("📤 Form data being sent to checkout:", formData);
 
-    navigate("/checkout", {
-      state: {
-        ...formData,
-        teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}` : "",
-      },
-    });
-  };
+  navigate("/checkout", {
+    state: {
+      ...formData,
+      teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}` : "",
+      totalRows: autoCalculatedRows,
+      // ✅ NEW: Pass data needed for breakdown detection
+      teacherId: teacher?._id,
+      canLinkDocuments: ['Schemes of Work', 'Lesson Plan', 'Lesson Notes'].includes(formData.type)
+    },
+  });
+};
 
   const handleBack = () => {
     if (userData?.role === 'Admin') {
@@ -317,7 +422,7 @@ export default function CreateDocument() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-semibold text-gray-700">Stream</Label>
+                    <Label className="font-semibold text-gray-700">Stream (Roll)</Label>
                     <Select
                       value={formData.stream}
                       onValueChange={(value) => handleChange("stream", value)}
@@ -358,7 +463,7 @@ export default function CreateDocument() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-semibold text-gray-700">Learning Area</Label>
+                    <Label className="font-semibold text-gray-700">Learning Area (Subject)</Label>
                     <Select
                       value={formData.learningArea}
                       onValueChange={(value) => handleChange("learningArea", value)}
@@ -401,8 +506,8 @@ export default function CreateDocument() {
                   <div className="space-y-2">
                     <Label className="font-semibold text-gray-700">Substrand</Label>
                     <Select
-                      value={formData.substrand} // CHANGED: substrands -> substrand
-                      onValueChange={(value) => handleChange("substrand", value)} // CHANGED: substrands -> substrand
+                      value={formData.substrand}
+                      onValueChange={(value) => handleChange("substrand", value)}
                     >
                       <SelectTrigger className="w-full bg-white border border-gray-200 rounded-xl py-5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
                         <SelectValue placeholder="Select Substrand" />
@@ -417,6 +522,70 @@ export default function CreateDocument() {
                     </Select>
                   </div>
                 </div>
+
+                {/* ✅ NEW: Auto-calculated Configuration Info Display */}
+                {(levelConfig || subjectConfig || formData.weeks) && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Curriculum Configuration
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {levelConfig && (
+                        <>
+                          <div>
+                            <span className="text-gray-600 font-medium">Age Range:</span>
+                            <span className="ml-2 text-gray-900 font-bold">{levelConfig.ageRange}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 font-medium">Lesson Duration:</span>
+                            <span className="ml-2 text-gray-900 font-bold">{levelConfig.lessonDuration} minutes</span>
+                          </div>
+                        </>
+                      )}
+                      {formData.weeks && (
+                        <div>
+                          <span className="text-gray-600 font-medium">Weeks ({formData.term}):</span>
+                          <span className="ml-2 text-gray-900 font-bold">{formData.weeks} weeks</span>
+                        </div>
+                      )}
+                      {formData.lessonsPerWeek && (
+                        <div>
+                          <span className="text-gray-600 font-medium">Lessons/Week:</span>
+                          <span className="ml-2 text-gray-900 font-bold">{formData.lessonsPerWeek} lessons</span>
+                        </div>
+                      )}
+                      {autoCalculatedRows > 0 && (
+                        <div className="md:col-span-2 mt-2 pt-4 border-t border-blue-200">
+                          <span className="text-gray-600 font-medium">Total Lessons:</span>
+                          <span className="ml-2 text-blue-600 font-bold text-lg">
+                            {autoCalculatedRows} lessons
+                          </span>
+                          <span className="ml-2 text-gray-500 text-xs">
+                            ({formData.weeks} weeks × {formData.lessonsPerWeek} lessons/week)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ NEW: Time Field (Optional for Lesson Plans) */}
+                {formData.type === 'Lesson Plan' && (
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-gray-700">
+                      Time (Optional)
+                      <span className="text-gray-500 text-sm ml-2">e.g., 7:30 am - 8:10 am</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="7:30 am - 8:10 am"
+                      value={formData.time}
+                      onChange={(e) => handleChange("time", e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-5"
+                    />
+                  </div>
+                )}
 
                 {/* Document Type */}
                 <div className="space-y-2">

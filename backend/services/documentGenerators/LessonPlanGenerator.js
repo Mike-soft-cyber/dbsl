@@ -6,116 +6,166 @@ class LessonPlanGenerator extends BaseDocumentGenerator {
   }
 
   createPrompt(requestData, cbcEntry) {
-    const { school, teacherName, grade, learningArea, strand, substrand, term, weeks, date, time } = requestData;
-    
-    const safeWeeks = weeks || 12;
-    
-    // Extract CBC data
+    const { 
+      school, teacherName, grade, learningArea, strand, substrand, term, 
+      date, time, specificConcept, lessonNumber, weekNumber 
+    } = requestData;
+
+    // Extract and format CBC data
     const sloList = cbcEntry?.slo || [];
     const learningExperiences = cbcEntry?.learningExperiences || [];
     const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
     const resources = cbcEntry?.resources || [];
-    const assessmentData = cbcEntry?.assessment || [];
-    const reflectionNotes = cbcEntry?.reflection || [];
-    const noOfLessons = cbcEntry?.noOfLessons || 'Not specified';
+    const coreCompetencies = cbcEntry?.coreCompetencies || [];
+    const values = cbcEntry?.values || [];
+    
+    // Format SLOs properly
+    let formattedSLOs = 'Not specified';
+    if (sloList.length > 0) {
+      formattedSLOs = sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n');
+    }
 
-    const hasResources = resources && resources.length > 0;
-    const hasReflections = reflectionNotes && reflectionNotes.length > 0;
+    // Format learning experiences
+    let formattedExperiences = 'Not specified';
+    if (learningExperiences.length > 0) {
+      formattedExperiences = learningExperiences.map((exp, i) => `${i+1}. ${exp}`).join('\n');
+    }
 
-    return `Generate a Lesson Plan fully aligned with CBC framework data:
+    // Format key inquiry questions
+    let formattedQuestions = 'Not specified';
+    if (keyInquiryQuestions.length > 0) {
+      formattedQuestions = keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n');
+    }
 
-SCHOOL: ${this.escapeForPrompt(school)}
-FACILITATOR: ${this.escapeForPrompt(teacherName)}
-GRADE: ${this.escapeForPrompt(grade)}
-SUBJECT: ${this.escapeForPrompt(learningArea)}
-TERM: ${this.escapeForPrompt(term)}
-WEEKS: ${safeWeeks}
+    // Format resources
+    let formattedResources = 'Not specified';
+    if (resources.length > 0) {
+      formattedResources = resources.join(', ');
+    }
+
+    return `Generate a comprehensive Lesson Plan for Kenyan Competency Based Curriculum (CBC).
+
+═══════════════════════════════════════════════════════════════════
+📋 DOCUMENT INFORMATION
+═══════════════════════════════════════════════════════════════════
+
+SCHOOL: ${school}
+FACILITATOR: ${teacherName}
+GRADE: ${grade}
+SUBJECT: ${learningArea}
+TERM: ${term}
+LESSON NUMBER: ${lessonNumber || 'X'} of ${cbcEntry?.noOfLessons || 'X'} total lessons
 DATE: ${date || 'Thursday 29th January 2025'}
 TIME: ${time || '7:30 am – 8:10 am'}
-LESSON: [X] of ${noOfLessons} total lessons
+STRAND: ${strand}
+SUB-STRAND: ${substrand}
 
-STRAND: ${this.escapeForPrompt(strand)}
-SUB-STRAND: ${this.escapeForPrompt(substrand)}
+═══════════════════════════════════════════════════════════════════
+🎯 SPECIFIC LEARNING CONCEPT FOR THIS LESSON
+═══════════════════════════════════════════════════════════════════
 
-## CBC FRAMEWORK ALIGNMENT
+${specificConcept || 'General concept related to the sub-strand'}
 
-SPECIFIC LEARNING OUTCOMES: By the end of the lesson, learners should be able to:
-${sloList.slice(0, 4).map((slo, i) => `- ${slo}`).join('\n')}
+═══════════════════════════════════════════════════════════════════
+📚 CBC CURRICULUM DATA
+═══════════════════════════════════════════════════════════════════
+
+SPECIFIC LEARNING OUTCOMES (SLO):
+${formattedSLOs}
+
+LEARNING EXPERIENCES:
+${formattedExperiences}
 
 KEY INQUIRY QUESTIONS:
-${keyInquiryQuestions.slice(0, 4).map((q, i) => `${i+1}. ${q}`).join('\n')}
+${formattedQuestions}
 
-LEARNING EXPERIENCES TO IMPLEMENT:
-${learningExperiences.slice(0, 3).map((exp, i) => `${i+1}. ${exp}`).join('\n')}
+LEARNING RESOURCES:
+${formattedResources}
 
-ASSESSMENT FOCUS:
-${assessmentData.slice(0, 3).map((criteria, i) => `• ${criteria.skill} - ${criteria.meets || 'Performance indicator'}`).join('\n')}
+CORE COMPETENCIES:
+${coreCompetencies.length > 0 ? coreCompetencies.join(', ') : 'Communication and Collaboration, Critical Thinking and Problem Solving, Creativity and Innovation'}
 
-${hasResources ? `LEARNING RESOURCES:
-${resources.join(', ')}` : `GENERATE LEARNING RESOURCES:
-Create 5 specific lesson resources for teaching ${this.escapeForPrompt(substrand)} to ${this.escapeForPrompt(grade)} students.`}
+VALUES:
+${values.length > 0 ? values.join(', ') : 'Love, Responsibility, Respect, Unity, Peace'}
 
-ORGANIZATION OF LEARNING:
-[Organize based on learning experiences: ${learningExperiences.join('; ')}]
+═══════════════════════════════════════════════════════════════════
+📝 LESSON PLAN STRUCTURE REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
 
-## LESSON STRUCTURE
+Generate a COMPLETE lesson plan with these sections:
 
-INTRODUCTION: (5 minutes)
-[Engaging opening that connects to: ${keyInquiryQuestions[0] || 'main inquiry question'}]
+1. LESSON TITLE: Create an engaging title for this lesson
 
-LESSON DEVELOPMENT:
+2. LESSON DURATION: 40 minutes (specify time allocation for each section)
 
-STEP 1: [SLO Focus: ${sloList[0] || 'First learning outcome'}]
-    Facilitator: [Implement learning experience: ${learningExperiences[0] || 'Primary activity'}]
-    Learners: [Respond to inquiry: ${keyInquiryQuestions[0] || 'Key question'}]
-    Assessment: [Observe ${assessmentData[0]?.skill || 'key skill'}]
+3. SPECIFIC LEARNING OUTCOMES (SLO):
+   By the end of the lesson, the learner should be able to:
+   - Outcome 1 (from CBC data above)
+   - Outcome 2 (from CBC data above)
 
-STEP 2: [SLO Focus: ${sloList[1] || 'Second learning outcome'}]
-    Facilitator: [Guide activity: ${learningExperiences[1] || 'Secondary activity'}]
-    Learners: [Engage with: ${keyInquiryQuestions[1] || 'Inquiry question'}]
-    Assessment: [Evaluate ${assessmentData[1]?.skill || 'skill development'}]
+4. KEY INQUIRY QUESTION:
+   Use one of the questions from above
 
-STEP 3: [SLO Focus: ${sloList[2] || 'Third learning outcome'}]
-    Facilitator: [Facilitate: ${learningExperiences[2] || 'Hands-on experience'}]
-    Learners: [Apply knowledge to: ${keyInquiryQuestions[2] || 'Problem-solving'}]
-    Assessment: [Check ${assessmentData[2]?.skill || 'understanding'}]
+5. LEARNING RESOURCES:
+   List specific resources needed
 
-STEP 4: [Integration and Synthesis]
-    Facilitator: [Connect all SLOs and experiences]
-    Learners: [Demonstrate understanding across inquiry questions]
-    Assessment: [Holistic evaluation of all targeted skills]
+6. ORGANIZATION OF LEARNING:
+   How learners will be organized (pairs, groups, individual)
 
-EXTENDED ACTIVITIES:
-• Advanced: [For learners exceeding expectations: ${assessmentData[0]?.exceeds || 'Extension activities'}]
-• Support: [For learners below expectations: ${assessmentData[0]?.below || 'Remedial activities'}]
+7. INTRODUCTION (5-7 minutes):
+   - How you will introduce the lesson
+   - Link to previous knowledge
+   - Capture learner interest
 
-CONCLUSION: (5 minutes)
-[Summarize key concepts, link to next lesson in sequence of ${noOfLessons}]
+8. LESSON DEVELOPMENT (25-30 minutes):
+   STEP 1: [Activity 1 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
+   
+   STEP 2: [Activity 2 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
+   
+   STEP 3: [Activity 3 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
 
-## ASSESSMENT RUBRIC
-${assessmentData.map(criteria => `${criteria.skill}:
-• Exceeds: ${criteria.exceeds || 'Advanced demonstration'}
-• Meets: ${criteria.meets || 'Satisfactory performance'}  
-• Approaches: ${criteria.approaches || 'Developing understanding'}
-• Below: ${criteria.below || 'Needs support'}`).join('\n\n')}
+9. EXTENDED ACTIVITIES (5 minutes):
+   - Additional practice
+   - Homework assignment
+   - Further exploration
 
-${hasReflections ? `REFLECTION:
-Framework: ${reflectionNotes.join('; ')}` : `GENERATE REFLECTION FRAMEWORK:
-Create 6 specific reflection points for evaluating this ${this.escapeForPrompt(substrand)} lesson's effectiveness, including SLO achievement, student engagement, and teaching strategy success.`}
+10. CONCLUSION (5 minutes):
+    - Summary of key points
+    - Assessment of learning
+    - Preview of next lesson
 
-• SLO achievement: [Rate 1-4 for each outcome]
-• Learning experience effectiveness: [Evaluate each activity]
-• Inquiry question engagement: [Student response quality]
-• Assessment accuracy: [Rubric application notes]
-• Resource utilization: [Material effectiveness]
-• Next lesson preparation: [Adjustments needed]
+11. ASSESSMENT:
+    - Methods used during the lesson
+    - Criteria for success
 
-REQUIREMENTS:
-- Integrate ALL CBC data: SLOs, experiences, questions, assessments
-- Use specific learning experiences: ${learningExperiences.join('; ')}
-- Address all inquiry questions: ${keyInquiryQuestions.join('; ')}
-- Apply assessment criteria: ${assessmentData.map(a => a.skill).join('; ')}
-- Make appropriate for ${this.escapeForPrompt(grade)} level`;
+12. TEACHER'S REFLECTION:
+    - Questions to reflect on after the lesson
+    - Notes for improvement
+
+═══════════════════════════════════════════════════════════════════
+✅ QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
+
+• Use CLEAR, professional language suitable for ${grade} level
+• Include TIME ALLOCATIONS for each section (total 40 minutes)
+• Make activities PRACTICAL and engaging
+• Use Kenyan context and examples
+• Include differentiation strategies for diverse learners
+• Align activities directly with SLOs
+• Ensure assessment matches learning outcomes
+• Make it immediately usable by teachers
+
+═══════════════════════════════════════════════════════════════════
+🚀 START GENERATING NOW
+═══════════════════════════════════════════════════════════════════
+
+Generate a complete, ready-to-use lesson plan following the structure above.`;
   }
 }
 

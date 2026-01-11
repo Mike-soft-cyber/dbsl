@@ -5,7 +5,10 @@ const mongoose = require('mongoose');
 const { docCreatedActivity } = require('./activityController');
 const DocumentGeneratorFactory = require('../services/DocumentGeneratorFactory');
 const ContentParser = require('../utils/contentProcessor');
-const { processMarkdownImages } = require('./imageController');
+const LevelConfig = require('../models/LevelConfig');
+const SubjectConfig = require('../models/SubjectConfig');
+const path = require('path');
+const fs = require('fs');
 
 // ADD MISSING IMPORTS
 const { OpenAI } = require("openai");
@@ -136,6 +139,7 @@ exports.getDocCountOfSchool = async (req, res) => {
 };
 
 // SIMPLIFIED enhanced generation - WITH ACTIVITY TRACKING
+// ✅ ENHANCED: Generate document with proper curriculum configuration
 exports.generateDocumentEnhanced = async (req, res) => {
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -155,40 +159,37 @@ exports.generateDocumentEnhanced = async (req, res) => {
 
     const { 
       type, term, grade, learningArea, strand, substrand, 
-      school, teacherName, weeks, lessonsPerWeek 
+      school, teacherName 
     } = req.body;
 
-    console.log(`[${requestId}] Validated request: ${type} for ${grade} ${learningArea} - ${substrand}`);
+    console.log(`[${requestId}] ✅ Request: ${type} for ${grade} ${learningArea}`);
 
-    // Find CBC entry
-    console.log(`[${requestId}] Fetching CBC entry from database`);
-    let cbcEntry = await CBCEntry.findOne({ 
-      grade: { $regex: new RegExp(grade, 'i') }, 
-      learningArea: { $regex: new RegExp(learningArea, 'i') }, 
-      strand: { $regex: new RegExp(strand, 'i') }, 
-      substrand: { $regex: new RegExp(substrand, 'i') } 
+    // ✅ STEP 1: Fetch curriculum configuration
+    console.log(`[${requestId}] Fetching curriculum configuration...`);
+    
+    const levelConfig = await LevelConfig.findOne({ 
+      grades: grade 
     });
     
-    if (!cbcEntry) {
-      console.log(`[${requestId}] CBC entry not found, searching with relaxed criteria`);
-      
-      cbcEntry = await CBCEntry.findOne({
-        grade: { $regex: new RegExp(grade, 'i') },
-        learningArea: { $regex: new RegExp(learningArea, 'i') }
-      });
-      
-      if (!cbcEntry) {
-        return res.status(404).json({ 
-          error: "No CBC data found",
-          message: `No curriculum data available for ${grade} ${learningArea} - ${strand} - ${substrand}. Please check your selection.`
-        });
-      }
+    const subjectConfig = await SubjectConfig.findOne({
+      subject: { $regex: new RegExp(learningArea, 'i') },
+      grades: grade
+    });
+
+    if (!levelConfig || !subjectConfig) {
+      console.warn(`[${requestId}] ⚠️ Missing curriculum config, using defaults`);
     }
 
-    // Validate CBC entry
-    const cbcValidation = validateCBCEntry(cbcEntry);
+    // ✅ STEP 2: Calculate weeks based on term
+    const termNumber = term?.replace('Term ', '').replace('term', '');
+    const weekMap = {
+      '1': subjectConfig?.termWeeks?.term1 || 10,
+      '2': subjectConfig?.termWeeks?.term2 || 11,
+      '3': subjectConfig?.termWeeks?.term3 || 6
+    };
+    const weeksForTerm = weekMap[termNumber] || 10;
 
-    // Prepare request data
+    // ✅ STEP 3: Build request data with curriculum config
     const requestData = {
       school: sanitizeInput(school) || "Educational Institution",
       teacherName: sanitizeInput(teacherName) || "Teacher",
@@ -197,76 +198,82 @@ exports.generateDocumentEnhanced = async (req, res) => {
       strand: sanitizeInput(strand),
       substrand: sanitizeInput(substrand),
       term: sanitizeInput(term),
-      weeks: parseInt(weeks) || 12,
-      lessonsPerWeek: parseInt(lessonsPerWeek) || 5,
-      date: req.body.date,
-      time: req.body.time,
+      // ✅ CRITICAL: Use curriculum configuration
+      weeks: weeksForTerm,
+      lessonsPerWeek: subjectConfig?.lessonsPerWeek || 5,
+      lessonDuration: levelConfig?.lessonDuration || 40,
+      ageRange: levelConfig?.ageRange || 'Not specified',
       teacher: req.body.teacher
     };
 
-    console.log(`[${requestId}] Request data prepared, generating document...`);
+    // ✅ Log final configuration
+    console.log(`[${requestId}] ✅ Curriculum configuration:`, {
+      term: term,
+      weeks: requestData.weeks,
+      lessonsPerWeek: requestData.lessonsPerWeek,
+      lessonDuration: requestData.lessonDuration,
+      expectedRows: requestData.weeks * requestData.lessonsPerWeek
+    });
 
-    // Generate document
+    // ✅ STEP 4: Find CBC entry
+    console.log(`[${requestId}] Fetching CBC entry...`);
+    let cbcEntry = await CBCEntry.findOne({ 
+      grade: { $regex: new RegExp(grade, 'i') }, 
+      learningArea: { $regex: new RegExp(learningArea, 'i') }, 
+      strand: { $regex: new RegExp(strand, 'i') }, 
+      substrand: { $regex: new RegExp(substrand, 'i') } 
+    });
+    
+    if (!cbcEntry) {
+      return res.status(404).json({ 
+        error: "No CBC data found",
+        message: `No curriculum data available for ${grade} ${learningArea} - ${strand} - ${substrand}`
+      });
+    }
+
+    console.log(`[${requestId}] ✅ Found CBC entry with ${cbcEntry.slo?.length || 0} SLOs`);
+
+    // ✅ STEP 5: Generate document
+    console.log(`[${requestId}] Generating ${type}...`);
     let document = await DocumentGeneratorFactory.generate(type, requestData, cbcEntry);
 
-    if (!document) {
-      throw new Error('Document generation returned null');
+    if (!document || !document._id) {
+      throw new Error('Document generation failed');
     }
 
-    // FIX: Ensure document has an _id
-    if (!document._id) {
-      throw new Error('Generated document missing _id');
-    }
+    console.log(`[${requestId}] ✅ Generated document: ${document._id}`);
 
-    console.log(`[${requestId}] Document generated with ID: ${document._id}`);
-
-    // ✅ ADD ACTIVITY TRACKING HERE
+    // ✅ STEP 6: Track activity
     try {
       const activityData = {
         teacherName: req.user?.firstName + ' ' + (req.user?.lastName || ''),
         teacherId: req.user?._id,
         grade: grade,
-        stream: requestData.stream || 'General',
+        stream: 'General',
         learningArea: learningArea,
         docType: type,
         schoolCode: req.user?.schoolCode,
         documentId: document._id
       };
 
-      console.log(`[${requestId}] Logging document creation activity:`, activityData);
       await docCreatedActivity(activityData);
-      console.log(`[${requestId}] ✅ Document creation activity logged successfully`);
+      console.log(`[${requestId}] ✅ Activity logged`);
     } catch (activityError) {
-      console.error(`[${requestId}] ❌ Failed to log activity:`, activityError);
-      // Don't fail the whole request if activity logging fails
+      console.error(`[${requestId}] ⚠️ Activity logging failed:`, activityError);
     }
 
-    // Process images in the generated content
-    if (document && document.content) {
-      console.log(`[${requestId}] Processing images in document content...`);
-      try {
-        const { processMarkdownImages } = require('./imageController');
-        document.content = await processMarkdownImages(document.content);
-        await document.save();
-        console.log(`[${requestId}] Images processed and saved`);
-      } catch (imageError) {
-        console.error(`[${requestId}] Image processing failed:`, imageError);
-        // Continue even if image processing fails - document is still usable
-      }
-    }
-
+    // ✅ STEP 7: Update user stats
     if (req.user?._id) {
       await User.findByIdAndUpdate(
         req.user._id,
         { $inc: { documentsCreated: 1 } }
       );
-      console.log(`Updated documentsCreated count for teacher ${req.user._id}`);
     }
 
     const totalTime = Date.now() - startTime;
-    console.log(`[${requestId}] Document generated successfully in ${totalTime}ms`);
+    console.log(`[${requestId}] ✅ Complete in ${totalTime}ms`);
 
-    // Return the document with clear ID
+    // ✅ STEP 8: Return response
     res.status(201).json({
       success: true,
       document: {
@@ -285,32 +292,24 @@ exports.generateDocumentEnhanced = async (req, res) => {
       metadata: {
         requestId,
         generationTime: totalTime,
-        cbcDataQuality: cbcValidation.score,
-        warnings: cbcValidation.warnings
+        curriculumConfig: {
+          weeks: requestData.weeks,
+          lessonsPerWeek: requestData.lessonsPerWeek,
+          lessonDuration: requestData.lessonDuration,
+          expectedRows: requestData.weeks * requestData.lessonsPerWeek
+        }
       }
     });
 
   } catch (err) {
     const totalTime = Date.now() - startTime;
-    console.error(`[${requestId}] Document generation failed after ${totalTime}ms:`, err);
+    console.error(`[${requestId}] ❌ Failed after ${totalTime}ms:`, err);
 
-    if (err.message.includes('timeout')) {
-      res.status(408).json({ 
-        error: "Generation timeout", 
-        message: "Document generation took too long. Please try again." 
-      });
-    } else if (err.message.includes('AI generation')) {
-      res.status(503).json({ 
-        error: "AI service unavailable", 
-        message: "The AI service is currently unavailable. Please try again." 
-      });
-    } else {
-      res.status(500).json({ 
-        error: "Generation failed", 
-        message: "Document generation encountered an error. Please try again.",
-        requestId 
-      });
-    }
+    res.status(500).json({ 
+      error: "Generation failed", 
+      message: err.message || "Document generation encountered an error",
+      requestId 
+    });
   }
 };
 
@@ -633,7 +632,7 @@ function validateGenerationRequest(body) {
   
   for (const field of required) {
     if (!body[field] || typeof body[field] !== 'string' || body[field].trim().length === 0) {
-      errors.push(`${field} is required and must be a non-empty string`);
+      errors.push(`${field} is required`);
     }
   }
   
@@ -647,6 +646,12 @@ function validateGenerationRequest(body) {
     errors
   };
 }
+
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  return input.trim().replace(/[<>"'&]/g, '');
+}
+
 
 function validateCBCEntry(cbcEntry) {
   const warnings = [];
@@ -1641,3 +1646,689 @@ exports.serveDiagram = async (req, res) => {
     res.status(500).json({ error: 'Failed to serve diagram' });
   }
 };
+
+exports.generateSchemeFromBreakdown = async (req, res) => {
+  const startTime = Date.now();
+  const requestId = `scheme_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    const { breakdownId } = req.params;
+    const { teacherName, school } = req.body;
+    
+    console.log(`[${requestId}] Starting scheme generation from breakdown:`, breakdownId);
+    
+    // 1. Fetch the Lesson Concept Breakdown
+    const breakdown = await Document.findById(breakdownId).populate('cbcEntry');
+    
+    if (!breakdown) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Lesson Concept Breakdown not found' 
+      });
+    }
+    
+    if (breakdown.type !== 'Lesson Concept Breakdown') {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Document must be a Lesson Concept Breakdown' 
+      });
+    }
+    
+    console.log(`[${requestId}] Found breakdown: ${breakdown.grade} ${breakdown.subject} - ${breakdown.substrand}`);
+    console.log(`[${requestId}] Content length: ${breakdown.content?.length || 0} chars`);
+    
+    // 2. Extract learning concepts from the breakdown table
+    const learningConcepts = extractConceptsFromBreakdown(breakdown.content);
+    
+    console.log(`[${requestId}] Extracted ${learningConcepts.length} concepts`);
+    
+    if (learningConcepts.length === 0) {
+      // Try one more fallback: look for any structured content
+      console.log(`[${requestId}] No concepts found, checking for any structured content...`);
+      
+      // Try to extract any numbered or bulleted items
+      const lines = breakdown.content?.split('\n') || [];
+      let fallbackCount = 0;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line && line.length > 10 && (line.includes('. ') || line.includes(') '))) {
+          const parts = line.split(/[\.\)]\s+/);
+          if (parts.length >= 2 && parts[1].length > 10) {
+            learningConcepts.push({
+              term: 'Term 1',
+              week: `Week ${fallbackCount + 1}`,
+              weekNum: fallbackCount + 1,
+              strand: breakdown.strand || 'General',
+              substrand: breakdown.substrand || 'General',
+              concept: parts[1].trim()
+            });
+            fallbackCount++;
+          }
+        }
+      }
+      
+      if (learningConcepts.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'No learning concepts found in breakdown',
+          message: 'Please ensure your Lesson Concept Breakdown contains a table with learning concepts. Each row should have at least a week number and concept description.'
+        });
+      }
+    }
+    
+    console.log(`[${requestId}] Using ${learningConcepts.length} concepts for scheme generation`);
+    
+    // 3. Generate Scheme of Work using these concepts
+    const requestData = {
+      teacher: req.user?._id,
+      teacherName: teacherName || req.user?.firstName + ' ' + (req.user?.lastName || '') || 'Teacher',
+      school: school || breakdown.school || 'Educational Institution',
+      grade: breakdown.grade,
+      learningArea: breakdown.subject,
+      strand: breakdown.strand,
+      substrand: breakdown.substrand,
+      term: breakdown.term,
+      weeks: Math.ceil(learningConcepts.length / 5), // Calculate weeks from concepts
+      lessonsPerWeek: 5,
+      learningConcepts: learningConcepts,
+      sourceBreakdownId: breakdownId,
+      totalConcepts: learningConcepts.length
+    };
+
+    console.log(`[${requestId}] Request data prepared:`, {
+      grade: requestData.grade,
+      subject: requestData.learningArea,
+      concepts: learningConcepts.length,
+      weeks: requestData.weeks
+    });
+
+    // 4. Generate the scheme document
+    let schemeDoc;
+    try {
+      schemeDoc = await DocumentGeneratorFactory.generate(
+        'Schemes of Work',
+        requestData,
+        breakdown.cbcEntry
+      );
+      
+      if (!schemeDoc || !schemeDoc._id) {
+        throw new Error('Document generation returned null or missing ID');
+      }
+      
+      console.log(`[${requestId}] ✅ Generated scheme: ${schemeDoc._id}`);
+      
+    } catch (generationError) {
+      console.error(`[${requestId}] ❌ Scheme generation failed:`, generationError);
+      return res.status(500).json({
+        success: false,
+        error: 'Scheme generation failed',
+        message: generationError.message
+      });
+    }
+
+    // 5. Link the documents
+    try {
+      await Document.findByIdAndUpdate(breakdownId, {
+        $push: {
+          'metadata.derivedDocuments': {
+            documentId: schemeDoc._id,
+            type: 'Schemes of Work',
+            createdAt: new Date()
+          }
+        }
+      });
+      
+      await Document.findByIdAndUpdate(schemeDoc._id, {
+        $set: {
+          parentDocument: breakdownId,
+          'metadata.sourceDocument': breakdownId,
+          'metadata.sourceType': 'Lesson Concept Breakdown'
+        }
+      });
+      
+      console.log(`[${requestId}] ✅ Documents linked successfully`);
+    } catch (linkError) {
+      console.error(`[${requestId}] ⚠️ Document linking failed:`, linkError);
+      // Continue even if linking fails
+    }
+
+    // 6. Track activity
+    try {
+      const activityData = {
+        teacherName: requestData.teacherName,
+        teacherId: req.user?._id,
+        grade: breakdown.grade,
+        stream: 'General',
+        learningArea: breakdown.subject,
+        docType: 'Schemes of Work',
+        schoolCode: req.user?.schoolCode,
+        documentId: schemeDoc._id
+      };
+
+      await docCreatedActivity(activityData);
+      console.log(`[${requestId}] ✅ Activity logged`);
+    } catch (activityError) {
+      console.error(`[${requestId}] ⚠️ Activity logging failed:`, activityError);
+    }
+
+    // 7. Update user stats
+    if (req.user?._id) {
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { $inc: { documentsCreated: 1 } }
+      );
+    }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[${requestId}] ✅ Complete in ${totalTime}ms`);
+
+    // 8. Return success response
+    res.status(201).json({
+      success: true,
+      document: {
+        _id: schemeDoc._id,
+        type: schemeDoc.type,
+        grade: schemeDoc.grade,
+        subject: schemeDoc.subject,
+        strand: schemeDoc.strand,
+        substrand: schemeDoc.substrand,
+        term: schemeDoc.term,
+        content: schemeDoc.content,
+        status: schemeDoc.status,
+        createdAt: schemeDoc.createdAt
+      },
+      documentId: schemeDoc._id,
+      conceptsUsed: learningConcepts.length,
+      metadata: {
+        requestId,
+        generationTime: totalTime,
+        sourceBreakdown: breakdownId,
+        conceptCount: learningConcepts.length
+      }
+    });
+    
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    console.error(`[generateScheme] ❌ Failed after ${totalTime}ms:`, error);
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Scheme generation failed", 
+      message: error.message || "An unexpected error occurred"
+    });
+  }
+};
+
+exports.generateLessonPlanFromBreakdown = async (req, res) => {
+  const startTime = Date.now();
+  const requestId = `lessonplan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    const { breakdownId } = req.params;
+    const { lessonNumber, teacherName, school, date, time } = req.body;
+    
+    console.log(`[${requestId}] Starting lesson plan generation from breakdown:`, breakdownId);
+    
+    // 1. Fetch the Lesson Concept Breakdown
+    const breakdown = await Document.findById(breakdownId).populate('cbcEntry');
+    
+    if (!breakdown) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Lesson Concept Breakdown not found' 
+      });
+    }
+    
+    if (breakdown.type !== 'Lesson Concept Breakdown') {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Document must be a Lesson Concept Breakdown' 
+      });
+    }
+    
+    console.log(`[${requestId}] Found breakdown: ${breakdown.grade} ${breakdown.subject}`);
+    
+    // 2. Extract learning concepts from the breakdown table
+    const learningConcepts = extractConceptsFromBreakdown(breakdown.content);
+    
+    console.log(`[${requestId}] Extracted ${learningConcepts.length} concepts`);
+    
+    if (learningConcepts.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'No learning concepts found in breakdown',
+        message: 'Please ensure your Lesson Concept Breakdown contains a table with learning concepts.'
+      });
+    }
+    
+    // 3. Get the specific lesson concept
+    const lessonIndex = parseInt(lessonNumber) - 1;
+    if (lessonIndex < 0 || lessonIndex >= learningConcepts.length) {
+      return res.status(400).json({ 
+        success: false,
+        error: `Lesson ${lessonNumber} not found. Available: 1-${learningConcepts.length}` 
+      });
+    }
+    
+    const selectedConcept = learningConcepts[lessonIndex];
+    console.log(`[${requestId}] Selected concept: Lesson ${lessonNumber} - "${selectedConcept.concept.substring(0, 50)}..."`);
+    
+    // 4. Get curriculum config for lesson duration
+    let lessonDuration = 40; // Default
+    try {
+      const levelConfig = await LevelConfig.findOne({ grades: breakdown.grade });
+      if (levelConfig) {
+        lessonDuration = levelConfig.lessonDuration;
+      }
+    } catch (configError) {
+      console.log(`[${requestId}] Using default lesson duration`);
+    }
+    
+    // 5. Generate Lesson Plan for this specific concept
+    const requestData = {
+      teacher: req.user?._id,
+      teacherName: teacherName || req.user?.firstName + ' ' + (req.user?.lastName || '') || 'Teacher',
+      school: school || breakdown.school || 'Educational Institution',
+      grade: breakdown.grade,
+      learningArea: breakdown.subject,
+      strand: breakdown.strand,
+      substrand: breakdown.substrand,
+      term: breakdown.term,
+      date: date || new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      time: time || '7:30 am – 8:10 am',
+      lessonDuration: lessonDuration,
+      specificConcept: selectedConcept.concept,
+      lessonNumber: parseInt(lessonNumber),
+      weekNumber: selectedConcept.weekNum || parseInt(lessonNumber),
+      sourceBreakdownId: breakdownId
+    };
+
+    console.log(`[${requestId}] Request data prepared:`, {
+      grade: requestData.grade,
+      subject: requestData.learningArea,
+      lessonNumber: requestData.lessonNumber,
+      concept: selectedConcept.concept.substring(0, 50)
+    });
+
+    // 6. Generate the lesson plan document
+    let lessonPlanDoc;
+    try {
+      lessonPlanDoc = await DocumentGeneratorFactory.generate(
+        'Lesson Plan',
+        requestData,
+        breakdown.cbcEntry
+      );
+      
+      if (!lessonPlanDoc || !lessonPlanDoc._id) {
+        throw new Error('Document generation returned null or missing ID');
+      }
+      
+      console.log(`[${requestId}] ✅ Generated lesson plan: ${lessonPlanDoc._id}`);
+      
+    } catch (generationError) {
+      console.error(`[${requestId}] ❌ Lesson plan generation failed:`, generationError);
+      return res.status(500).json({
+        success: false,
+        error: 'Lesson plan generation failed',
+        message: generationError.message
+      });
+    }
+
+    // 7. Link the documents
+    try {
+      await Document.findByIdAndUpdate(breakdownId, {
+        $push: {
+          'metadata.derivedDocuments': {
+            documentId: lessonPlanDoc._id,
+            type: 'Lesson Plan',
+            createdAt: new Date(),
+            lessonNumber: lessonNumber
+          }
+        }
+      });
+      
+      await Document.findByIdAndUpdate(lessonPlanDoc._id, {
+        $set: {
+          parentDocument: breakdownId,
+          'metadata.sourceDocument': breakdownId,
+          'metadata.sourceType': 'Lesson Concept Breakdown',
+          'metadata.lessonNumber': lessonNumber,
+          'metadata.specificConcept': selectedConcept.concept
+        }
+      });
+      
+      console.log(`[${requestId}] ✅ Documents linked successfully`);
+    } catch (linkError) {
+      console.error(`[${requestId}] ⚠️ Document linking failed:`, linkError);
+      // Continue even if linking fails
+    }
+
+    // 8. Track activity
+    try {
+      const activityData = {
+        teacherName: requestData.teacherName,
+        teacherId: req.user?._id,
+        grade: breakdown.grade,
+        stream: 'General',
+        learningArea: breakdown.subject,
+        docType: 'Lesson Plan',
+        schoolCode: req.user?.schoolCode,
+        documentId: lessonPlanDoc._id
+      };
+
+      await docCreatedActivity(activityData);
+      console.log(`[${requestId}] ✅ Activity logged`);
+    } catch (activityError) {
+      console.error(`[${requestId}] ⚠️ Activity logging failed:`, activityError);
+    }
+
+    // 9. Update user stats
+    if (req.user?._id) {
+      await User.findByIdAndUpdate(
+        req.user._id,
+        { $inc: { documentsCreated: 1 } }
+      );
+    }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[${requestId}] ✅ Complete in ${totalTime}ms`);
+
+    // 10. Return success response
+    res.status(201).json({
+      success: true,
+      document: {
+        _id: lessonPlanDoc._id,
+        type: lessonPlanDoc.type,
+        grade: lessonPlanDoc.grade,
+        subject: lessonPlanDoc.subject,
+        strand: lessonPlanDoc.strand,
+        substrand: lessonPlanDoc.substrand,
+        term: lessonPlanDoc.term,
+        content: lessonPlanDoc.content,
+        status: lessonPlanDoc.status,
+        createdAt: lessonPlanDoc.createdAt
+      },
+      documentId: lessonPlanDoc._id,
+      lessonNumber: lessonNumber,
+      concept: selectedConcept.concept,
+      metadata: {
+        requestId,
+        generationTime: totalTime,
+        sourceBreakdown: breakdownId,
+        lessonNumber: lessonNumber
+      }
+    });
+    
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    console.error(`[generateLessonPlan] ❌ Failed after ${totalTime}ms:`, error);
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Lesson plan generation failed", 
+      message: error.message || "An unexpected error occurred"
+    });
+  }
+};
+
+
+function extractConceptsFromBreakdown(content) {
+  if (!content) {
+    console.log('[extractConcepts] No content provided');
+    return [];
+  }
+
+  const concepts = [];
+  const lines = content.split('\n');
+  
+  console.log('[extractConcepts] Total lines:', lines.length);
+  
+  let inTable = false;
+  let headerFound = false;
+  let lineCount = 0;
+
+  for (const line of lines) {
+    lineCount++;
+    const trimmedLine = line.trim();
+    
+    // Skip empty lines
+    if (!trimmedLine) continue;
+    
+    // Look for table header - specifically for your format
+    if (!headerFound && trimmedLine.includes('|') && trimmedLine.toLowerCase().includes('learning concept')) {
+      headerFound = true;
+      inTable = true;
+      console.log(`[extractConcepts] ✅ Found table header at line ${lineCount}`);
+      console.log(`[extractConcepts] Header: ${trimmedLine}`);
+      console.log(`[extractConcepts] Columns: ${trimmedLine.split('|').length}`);
+      continue;
+    }
+    
+    // Skip separator lines (--- | --- | ---)
+    if (trimmedLine.match(/^[\|\-\s:]+$/)) {
+      continue;
+    }
+    
+    // Process data rows
+    if (inTable && trimmedLine.includes('|')) {
+      // Split by pipe and clean cells
+      const rawCells = trimmedLine.split('|');
+      const cells = rawCells
+        .map(c => c.trim())
+        .filter(c => c && c !== '' && !c.match(/^[\-\s]+$/)); // Filter out separator-like cells
+      
+      console.log(`[extractConcepts] Line ${lineCount}: ${cells.length} valid cells`);
+      
+      // CRITICAL: Your table has 6 columns but 5 actual data columns
+      // | Term | | Week | Strand | Sub-strand | Learning Concept |
+      // Index: 0     1     2        3           4                 5
+      
+      // Try to extract learning concept from different positions
+      let week = '';
+      let concept = '';
+      
+      if (cells.length === 6) {
+        // Full format with 6 columns (including empty column)
+        week = cells[2];     // Week is at index 2
+        concept = cells[5];  // Learning Concept is at index 5
+      } else if (cells.length === 5) {
+        // Some rows might have 5 columns (missing the empty one)
+        // Try different positions
+        if (cells[1] && cells[1].toLowerCase().includes('week')) {
+          week = cells[1];     // Week at index 1
+          concept = cells[4];  // Learning Concept at index 4
+        } else if (cells[0] && cells[0].toLowerCase().includes('week')) {
+          week = cells[0];     // Week at index 0  
+          concept = cells[3];  // Learning Concept at index 3
+        }
+      } else if (cells.length === 4) {
+        // Minimal format
+        week = cells[0];     // Week at index 0
+        concept = cells[3];  // Learning Concept at index 3
+      }
+      
+      // Validate the extracted data
+      const isValidWeek = week && (week.toLowerCase().includes('week') || /week\s*\d+/i.test(week));
+      const isValidConcept = concept && concept.length > 5 && 
+                            !concept.toLowerCase().includes('learning concept') &&
+                            !concept.toLowerCase().includes('please regenerate');
+      
+      if (isValidWeek && isValidConcept) {
+        // Extract week number
+        const weekMatch = week.match(/(\d+)/);
+        const weekNumber = weekMatch ? parseInt(weekMatch[1]) : concepts.length + 1;
+        
+        concepts.push({
+          week: `Week ${weekNumber}`,
+          weekNumber: weekNumber,
+          concept: concept
+        });
+        
+        console.log(`[extractConcepts] ✅ Added: Week ${weekNumber} - "${concept.substring(0, 50)}..."`);
+      } else {
+        if (!isValidWeek) console.log(`[extractConcepts] ⚠️ Invalid week: "${week}"`);
+        if (!isValidConcept) console.log(`[extractConcepts] ⚠️ Invalid concept: "${concept?.substring(0, 30)}"`);
+      }
+    }
+    
+    // Safety: stop if we've processed a lot of rows
+    if (concepts.length >= 50) {
+      break;
+    }
+  }
+  
+  console.log(`[extractConcepts] 🎯 Extraction complete: ${concepts.length} concepts found`);
+  
+  // If still no concepts, try a simpler approach
+  if (concepts.length === 0) {
+    return extractConceptsSimple(content);
+  }
+  
+  return concepts;
+};
+
+// Simple extraction that just looks for Week X patterns
+const extractConceptsSimple = (content) => {
+  const concepts = [];
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    
+    // Look for "Week X" pattern followed by concept
+    const weekMatch = trimmedLine.match(/week\s*(\d+)/i);
+    if (weekMatch) {
+      const weekNumber = parseInt(weekMatch[1]);
+      
+      // Extract everything after "Week X"
+      const afterWeek = trimmedLine.substring(weekMatch.index + weekMatch[0].length);
+      const concept = afterWeek.split('|').pop().trim();
+      
+      if (concept && concept.length > 10 && !concept.toLowerCase().includes('learning concept')) {
+        concepts.push({
+          week: `Week ${weekNumber}`,
+          weekNumber: weekNumber,
+          concept: concept
+        });
+        console.log(`[extractSimple] ✅ Added: Week ${weekNumber} - "${concept.substring(0, 50)}..."`);
+      }
+    }
+  }
+  
+  return concepts;
+};
+
+// Fallback extraction for non-table content
+const extractConceptsFallback = (content) => {
+  const concepts = [];
+  const lines = content.split('\n');
+  let conceptNumber = 1;
+  
+  console.log('[extractConceptsFallback] Starting fallback extraction');
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    
+    if (!trimmedLine || trimmedLine.length < 15) continue;
+    
+    // Look for patterns that might indicate learning concepts
+    const patterns = [
+      /week\s*(\d+)[:.]?\s*(.+)/i,
+      /^(\d+)\.\s*(.+)$/,
+      /^[a-z]\)\s*(.+)$/,
+      /^[-•]\s*(.+)$/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = trimmedLine.match(pattern);
+      if (match) {
+        let weekNum = conceptNumber;
+        let conceptText = '';
+        
+        if (pattern.toString().includes('week')) {
+          weekNum = parseInt(match[1]) || conceptNumber;
+          conceptText = match[2];
+        } else {
+          conceptText = match[1] || match[2] || trimmedLine;
+        }
+        
+        if (conceptText && conceptText.length > 10) {
+          concepts.push({
+            week: `Week ${weekNum}`,
+            weekNumber: weekNum,
+            concept: conceptText.trim()
+          });
+          conceptNumber++;
+          console.log(`[extractConceptsFallback] ✅ Added: Week ${weekNum} - "${conceptText.substring(0, 50)}..."`);
+          break;
+        }
+      }
+    }
+  }
+  
+  console.log(`[extractConceptsFallback] Fallback found ${concepts.length} concepts`);
+  return concepts;
+}
+
+// ✅ NEW: Fallback extraction method
+function extractLearningConceptsFallback(content) {
+  const concepts = [];
+  
+  if (!content) return concepts;
+  
+  const lines = content.split('\n');
+  let conceptNumber = 1;
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    
+    if (!trimmedLine || trimmedLine.length < 10) continue;
+    
+    // Look for lines that might contain learning concepts
+    if ((trimmedLine.toLowerCase().includes('week') || 
+         trimmedLine.includes('|') ||
+         /^\d+\./.test(trimmedLine) ||
+         /^[a-z]\)/.test(trimmedLine)) &&
+        trimmedLine.length > 15 &&
+        !trimmedLine.toLowerCase().includes('header') &&
+        !trimmedLine.toLowerCase().includes('term') &&
+        !trimmedLine.toLowerCase().includes('strand')) {
+      
+      // Try to extract week number
+      let weekNum = conceptNumber;
+      const weekMatch = trimmedLine.match(/week\s*(\d+)/i);
+      if (weekMatch) {
+        weekNum = parseInt(weekMatch[1]);
+      }
+      
+      // Extract concept text (remove markers)
+      let conceptText = trimmedLine
+        .replace(/^\d+\.\s*/, '')  // Remove "1. "
+        .replace(/^[a-z]\)\s*/, '') // Remove "a) "
+        .replace(/^\|\s*/, '')      // Remove leading "| "
+        .replace(/\|\s*$/, '')      // Remove trailing " |"
+        .replace(/week\s*\d+/gi, '') // Remove "Week X"
+        .trim();
+      
+      if (conceptText.length > 10) {
+        concepts.push({
+          term: 'Term 1',
+          week: `Week ${weekNum}`,
+          weekNum: weekNum,
+          strand: 'General',
+          substrand: 'General',
+          concept: conceptText
+        });
+        conceptNumber++;
+      }
+    }
+  }
+  
+  return concepts;
+}
