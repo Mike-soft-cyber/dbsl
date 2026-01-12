@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from "sonner";
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { User, Lock, Mail, Phone, School, Eye, EyeOff, BookOpen } from 'lucide-react';
+import { FcGoogle} from 'react-icons/fc'
 import API from '../api';
 
 export default function Signup() {
@@ -34,7 +35,6 @@ export default function Signup() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Password confirmation check
         if (formData.password !== formData.confirmPassword) {
             toast.error("Passwords do not match");
             return;
@@ -43,18 +43,10 @@ export default function Signup() {
         setLoading(true);
 
         try {
-            // Fixed: Changed from '/user/register' to '/user/register' 
-            // This matches your backend route: router.post('/register', user.signup);
             const res = await API.post('/user/register', formData);
-            
-            // The backend returns a message and user info but NO token initially
-            // since email verification is required
             const { user, message } = res.data;
 
             toast.success(message || "Account created! Please check your email to verify your account.");
-            
-            // Don't store token or redirect immediately - user needs to verify email first
-            // Just redirect to login page or show verification message
             navigate('/login');
             
         } catch (err) {
@@ -63,6 +55,12 @@ export default function Signup() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // ✅ ADD: Google Signup Handler
+    const handleGoogleSignup = () => {
+        const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+        window.location.href = `${backendUrl}/api/user/google`;
     };
 
     return (
@@ -84,6 +82,26 @@ export default function Signup() {
                 </CardHeader>
                 
                 <CardContent>
+                    {/* ✅ ADD: Google Signup Button */}
+                    <Button
+                        type="button"
+                        onClick={handleGoogleSignup}
+                        className="w-full bg-white hover:bg-gray-50 text-gray-800 border-2 border-gray-200 py-5 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 mb-4"
+                    >
+                        <FcGoogle/>
+                        <span className="ml-2 font-semibold">Sign up with Google</span>
+                    </Button>
+
+                    {/* ✅ ADD: Divider */}
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-4 bg-white text-gray-500">Or sign up with email</span>
+                        </div>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Name Fields */}
                         <div className="grid grid-cols-2 gap-4">

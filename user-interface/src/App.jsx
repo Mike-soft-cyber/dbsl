@@ -20,7 +20,10 @@ import DocumentPage from './pages/DocumentPage';
 import VerifyEmail from './pages/VerifyEmail';
 import MyDocumentsPage from './pages/MyDocuments';
 import CBCReviewPage from './pages/CBCReviewPage';
+import AuthCallback from './pages/AuthCallback';
 import PendingReviewsDashboard from './pages/PendingReviewsDashboard';
+import CompleteGoogleSignup from './pages/CompleteGoogleSignup';
+import CompleteProfile from './pages/CompleteProfile';
 
 function App(){
     return (
@@ -30,6 +33,9 @@ function App(){
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/complete-profile" element={<CompleteProfile />} />
+                <Route path="/complete-google-signup" element={<CompleteGoogleSignup />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/createDocument" element={<CreateDocument />} />
                 <Route path="/dashboard" element={<DashBoard />} />

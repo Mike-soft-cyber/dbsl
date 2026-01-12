@@ -671,3 +671,44 @@ exports.getSchoolConfig = async (req, res) => {
         });
     }
 };
+
+exports.getProfile = async (req, res) => {
+  try {
+    console.log('📡 Profile request from user:', req.user?.id);
+    
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      console.log('❌ User not found:', req.user?.id);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('✅ Returning user profile:', {
+      email: user.email,
+      profilePic: user.profilePic,
+      signupMethod: user.signupMethod
+    });
+
+    // ✅ Return complete user object including profilePic
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      schoolName: user.schoolName,
+      schoolCode: user.schoolCode,
+      phone: user.phone,
+      profilePic: user.profilePic, // ✅ Critical for Google OAuth users
+      signupMethod: user.signupMethod,
+      isVerified: user.isVerified,
+      assignedClasses: user.assignedClasses,
+      documentsCreated: user.documentsCreated,
+      downloadedDocuments: user.downloadedDocuments
+    });
+
+  } catch (error) {
+    console.error('❌ Get profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

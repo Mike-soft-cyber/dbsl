@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, User, BookOpen, ChevronDown, X, FileText, Download, Settings } from "lucide-react";
+import { LogOut, User, BookOpen, ChevronDown, X, FileText, Settings } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { getProfilePictureUrl } from "@/utils/profilePicUtils";
 
 export default function Navbar({ userData }) {
   const navigate = useNavigate();
@@ -19,7 +19,29 @@ export default function Navbar({ userData }) {
   const [downloadCount, setDownloadCount] = useState(0);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-  const SERVER_BASE_URL = API_BASE_URL.replace("/api", "");
+
+  // ✅ Sync profile picture using utility function
+  const syncProfilePic = () => {
+    console.log('🔄 Syncing profile picture...');
+    
+    // Get userData from props or localStorage
+    const currentUserData = userData || JSON.parse(localStorage.getItem("userData"));
+    
+    if (!currentUserData) {
+      console.log('❌ No user data found');
+      return;
+    }
+
+    const profilePicValue = currentUserData.profilePic;
+    console.log('📸 Profile pic value from user data:', profilePicValue);
+    
+    // Use utility function to get the correct URL
+    const picUrl = getProfilePictureUrl(profilePicValue);
+    console.log('🎯 Resolved profile pic URL:', picUrl);
+    
+    setProfilePic(picUrl);
+    setImageError(false);
+  };
 
   // Fetch download count
   useEffect(() => {
@@ -40,28 +62,15 @@ export default function Navbar({ userData }) {
     };
     
     fetchDownloadCount();
-    
-    // Listen for download events
     window.addEventListener('documentDownloaded', fetchDownloadCount);
     return () => window.removeEventListener('documentDownloaded', fetchDownloadCount);
   }, [userData?._id, API_BASE_URL]);
 
-  // Sync profile picture
-  const syncProfilePic = () => {
-    const storedUserData = JSON.parse(localStorage.getItem("userData"));
-    const profilePicName = storedUserData?.profilePic || userData?.profilePic;
-    
-    if (profilePicName) {
-      const profilePicUrl = `${SERVER_BASE_URL}/uploads/profile-pics/${profilePicName}`;
-      setProfilePic(profilePicUrl);
-      setImageError(false);
-    } else {
-      setProfilePic(null);
-    }
-  };
-
+  // Initial sync and setup listeners
   useEffect(() => {
     syncProfilePic();
+    
+    // Listen for storage changes
     window.addEventListener("storage", syncProfilePic);
     window.addEventListener("profilePicUpdated", syncProfilePic);
 
@@ -79,7 +88,7 @@ export default function Navbar({ userData }) {
   const handleProfilePicClick = () => setIsZoomed(true);
   const handleCloseZoom = () => setIsZoomed(false);
   const handleImageError = () => {
-    console.error("Failed to load profile image:", profilePic);
+    console.error("❌ Failed to load profile image:", profilePic);
     setImageError(true);
   };
 
@@ -106,7 +115,7 @@ export default function Navbar({ userData }) {
               </h3>
             </div>
 
-            {/* ✅ Fixed Profile Picture - Instagram/Facebook Style */}
+            {/* Profile Picture */}
             <div className="flex items-center space-x-2">
               <div 
                 className="w-10 h-10 rounded-full border-2 border-gray-200 shadow-sm cursor-pointer overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 hover:border-gray-300 transition-all duration-200"
@@ -118,6 +127,8 @@ export default function Navbar({ userData }) {
                     alt="Profile"
                     className="w-full h-full object-cover"
                     onError={handleImageError}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -144,11 +155,11 @@ export default function Navbar({ userData }) {
                   </div>
 
                   <DropdownMenuItem asChild>
-  <Link to="/my-documents" className="flex items-center space-x-2 px-3 py-2 cursor-pointer hover:bg-gray-50 rounded-lg">
-    <FileText className="h-4 w-4 text-gray-600" />
-    <span>My Documents</span>
-  </Link>
-</DropdownMenuItem>
+                    <Link to="/my-documents" className="flex items-center space-x-2 px-3 py-2 cursor-pointer hover:bg-gray-50 rounded-lg">
+                      <FileText className="h-4 w-4 text-gray-600" />
+                      <span>My Documents</span>
+                    </Link>
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
@@ -186,7 +197,13 @@ export default function Navbar({ userData }) {
             </button>
             <div className="bg-white p-2 rounded-lg" onClick={(e) => e.stopPropagation()}>
               {profilePic && !imageError ? (
-                <img src={profilePic} alt="Profile Preview" className="w-full h-auto max-h-[70vh] object-contain rounded-md" />
+                <img 
+                  src={profilePic} 
+                  alt="Profile Preview" 
+                  className="w-full h-auto max-h-[70vh] object-contain rounded-md"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                />
               ) : (
                 <div className="w-64 h-64 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto">
                   <User className="text-white w-20 h-20" />

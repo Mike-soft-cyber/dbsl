@@ -3,6 +3,25 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
+require('./config/passport');  // This initializes Google strategy
+
+// ✅ CRITICAL: Debug before loading passport
+console.log('🚀 Starting server initialization...');
+console.log('🔍 Environment check:', {
+  NODE_ENV: process.env.NODE_ENV,
+  HAS_GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
+  HAS_GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET
+});
+
+// ✅ CRITICAL: Load passport configuration FIRST
+try {
+  require('./config/passport');  // This initializes Google strategy
+  console.log('✅ Passport config loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load passport config:', error.message);
+}
+const passport = require('passport');  // Then import passport
+
 require('dotenv').config();
 
 const app = express();
@@ -50,6 +69,7 @@ app.use((req, res, next) => {
 // ✅ Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(passport.initialize())
 
 app.options('/api/diagrams/:filename', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -217,7 +237,6 @@ const docDashRoutes = require('./routes/docDashRoutes');
 const schoolConfigRoutes = require('./routes/schoolConfigRoutes');
 const curriculumConfigRoutes = require('./routes/curriculumConfigRoutes');
 const cbcReviewRoutes = require('./routes/cbcReviewRoutes');
-const imageRoutes = require('./routes/imageRoutes')
 
 app.use('/api/user', authRoutes);
 app.use('/api/documents', docRoutes);
@@ -227,7 +246,6 @@ app.use('/api/school', schoolRoutes);
 app.use('/api/payments', paymentRoute);
 app.use('/api/activities', activityRoutes);
 app.use('/api/cbc', cbcEntryRoutes);
-app.use('/api', imageRoutes);
 app.use('/api/document-purchases', docDashRoutes);
 app.use('/api/curriculum-config', curriculumConfigRoutes);
 app.use('/api/cbc-review', cbcReviewRoutes);

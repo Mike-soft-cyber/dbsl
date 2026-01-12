@@ -4,6 +4,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Lock, Mail, Eye, EyeOff, BookOpen } from 'lucide-react';
+import { FcGoogle} from 'react-icons/fc'
 import { toast } from "sonner";
 import API from '@/api';
 import React from 'react';
@@ -13,7 +14,7 @@ function Login() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [unverified, setUnverified] = useState(false); // 👈 track unverified state
+    const [unverified, setUnverified] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
@@ -40,7 +41,7 @@ function Login() {
 
             if (error.response?.status === 403) {
                 toast.error(error.response.data.message);
-                setUnverified(true); // 👈 show resend option
+                setUnverified(true);
             } else {
                 toast.error(error.response?.data?.message || "Login Failed");
             }
@@ -49,7 +50,6 @@ function Login() {
         }
     };
 
-    // 👇 resend verification
     const handleResendVerification = async () => {
         try {
             await API.post('/user/resend-verification', { email });
@@ -57,6 +57,13 @@ function Login() {
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to resend verification.");
         }
+    };
+
+    // ✅ ADD: Google Login Handler
+    const handleGoogleLogin = () => {
+        // Redirect to backend Google OAuth endpoint
+        const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+        window.location.href = `${backendUrl}/api/user/google`;
     };
 
     return (
@@ -78,6 +85,26 @@ function Login() {
                 </CardHeader>
                 
                 <CardContent>
+                    {/* ✅ ADD: Google Login Button */}
+                    <Button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        className="w-full bg-white hover:bg-gray-50 text-gray-800 border-2 border-gray-200 py-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 mb-4"
+                    >
+                        <FcGoogle/>
+                        <span className="ml-2 font-semibold">Continue with Google</span>
+                    </Button>
+
+                    {/* ✅ ADD: Divider */}
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-4 bg-white text-gray-500">Or continue with email</span>
+                        </div>
+                    </div>
+
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
@@ -126,7 +153,6 @@ function Login() {
                         </Button>
                     </form>
 
-                    {/* 👇 Show resend button if unverified */}
                     {unverified && (
                         <div className="mt-4 text-center">
                             <p className="text-gray-600 text-sm mb-2">Didn't receive the email?</p>

@@ -1,4 +1,3 @@
-const express = require('express');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -193,56 +192,252 @@ const resendVerify = async (req, res) => {
   }
 }
 
+// ✅ NEW: Complete Google signup with additional info
+const completeGoogleSignup = async (req, res) => {
+  try {
+    const { token, schoolName, schoolCode, role, phone } = req.body;
+
+    if (!token || !schoolName || !schoolCode) {
+      return res.status(400).json({ 
+        message: "School information is required" 
+      });
+    }
+
+    // Verify the temporary token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(400).json({ 
+        message: "Invalid or expired token. Please try signing up again." 
+      });
+    }
+
+    if (!decoded.isGoogleSignup) {
+      return res.status(400).json({ 
+        message: "Invalid signup token" 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ 
+      $or: [
+        { email: decoded.email },
+        { googleId: decoded.googleId }
+      ]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ 
+        message: "User already exists. Please login instead." 
+      });
+    }
+
+    // Create new user with Google info + additional info
+    const newUser = await User.create({
+      googleId: decoded.googleId,
+      email: decoded.email,
+      firstName: decoded.firstName,
+      lastName: decoded.lastName,
+      profilePic: decoded.profilePic,
+      schoolName,
+      schoolCode,
+      role: role || 'Teacher',
+      phone: phone || '',
+      password: crypto.randomBytes(32).toString('hex'), // Random password (won't be used)
+      isVerified: true, // Auto-verify Google users
+    });
+
+    // Log activity
+    try {
+      await newTeacherActivity({
+        _id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        schoolCode: newUser.schoolCode
+      });
+      console.log('✅ Google user registration activity logged');
+    } catch (activityError) {
+      console.error('❌ Failed to log activity:', activityError);
+    }
+
+    // Generate full JWT token
+    const jwtToken = jwt.sign(
+      { id: newUser._id, email: newUser.email, role: newUser.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: "Google signup completed successfully!",
+      token: jwtToken,
+      user: {
+        _id: newUser._id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        schoolName: newUser.schoolName,
+        schoolCode: newUser.schoolCode,
+        role: newUser.role,
+        profilePic: newUser.profilePic,
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Complete Google signup error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const completeGoogleProfile = async (req, res) => {
+    try {
+        const { token, schoolName, schoolCode, role, phone } = req.body;
+
+        if (!token || !schoolName || !schoolCode) {
+            return res.status(400).json({ 
+                message: "Token and school information are required" 
+            });
+        }
+
+        // Verify the token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return res.status(400).json({ 
+                message: "Invalid or expired token. Please try signing up again." 
+            });
+        }
+
+        if (!decoded.needsProfile) {
+            return res.status(400).json({ 
+                message: "Invalid profile completion token" 
+            });
+        }
+
+        // Find and update user
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            return res.status(400).json({ 
+                message: "User not found" 
+            });
+        }
+
+        // Update user with complete info
+        user.schoolName = schoolName;
+        user.schoolCode = schoolCode;
+        user.role = role || 'Teacher';
+        user.phone = phone || '';
+        user.needsCompleteProfile = false;
+        
+        await user.save();
+
+        // Generate full JWT token
+        const newToken = jwt.sign(
+            { id: user._id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Log activity if needed
+        if (user.role === 'Teacher') {
+            try {
+                await newTeacherActivity({
+                    _id: user._id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    schoolCode: user.schoolCode
+                });
+                console.log('✅ Google user profile completion activity logged');
+            } catch (activityError) {
+                console.error('❌ Failed to log activity:', activityError);
+            }
+        }
+
+        res.json({
+            message: "Profile completed successfully!",
+            token: newToken,
+            user: {
+                _id: user._id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                schoolName: user.schoolName,
+                schoolCode: user.schoolCode,
+                role: user.role,
+                profilePic: user.profilePic,
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Complete Google profile error:', error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
 
 // Login route
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Find user
+    // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // 2. Check password
+    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // 3. Require verified email
+    // Check if email is verified
     if (!user.isVerified) {
       return res.status(403).json({ 
-        message: "Email not verified. Please check your inbox or request a new verification link." 
+        message: "Please verify your email before logging in",
+        needsVerification: true 
       });
     }
 
-    // 4. Generate JWT
+    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
+
+    // ✅ IMPORTANT: Return complete user object with profilePic
+    const userResponse = {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      schoolName: user.schoolName,
+      schoolCode: user.schoolCode,
+      phone: user.phone,
+      profilePic: user.profilePic, // ✅ Make sure this is included
+      signupMethod: user.signupMethod,
+      isVerified: user.isVerified,
+      assignedClasses: user.assignedClasses,
+      documentsCreated: user.documentsCreated
+    };
+
+    console.log('✅ Login successful for:', user.email);
+    console.log('📸 Profile pic value:', user.profilePic);
+    console.log('🔐 Signup method:', user.signupMethod);
 
     res.json({
       message: "Login successful",
       token,
-      user: {
-        _id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        schoolName: user.schoolName,
-        schoolCode: user.schoolCode,
-        role: user.role,
-        profilePic: user.profilePic || null,
-      },
+      user: userResponse
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Server error during login" });
   }
 };
 
-module.exports = { signup, login, verifyEmail, resendVerify };
+module.exports = { signup, login, verifyEmail, resendVerify, completeGoogleSignup, completeGoogleProfile  };

@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const documentController = require('../controllers/documentController');
 const pdfController = require('../controllers/pdfController');
+const Document = require('../models/Document')
 const authenticate = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs').promises;
