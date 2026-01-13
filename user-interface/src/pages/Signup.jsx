@@ -33,29 +33,41 @@ export default function Signup() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (formData.password !== formData.confirmPassword) {
-            toast.error("Passwords do not match");
-            return;
+  e.preventDefault();
+  
+  if (formData.password !== formData.confirmPassword) {
+    toast.error("Passwords do not match");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const res = await API.post('/user/register', formData);
+    const { success, message, user, needsVerification } = res.data;
+
+    if (success) {
+      toast.success(message);
+      
+      // ✅ Store user email for potential resend
+      localStorage.setItem('pendingVerificationEmail', formData.email);
+      
+      // ✅ Navigate to verification notice page
+      navigate('/verify-email', { 
+        state: { 
+          email: formData.email,
+          message: "Please check your email inbox and spam folder for the verification link."
         }
-
-        setLoading(true);
-
-        try {
-            const res = await API.post('/user/register', formData);
-            const { user, message } = res.data;
-
-            toast.success(message || "Account created! Please check your email to verify your account.");
-            navigate('/login');
-            
-        } catch (err) {
-            console.error("Signup error:", err.response ? err.response.data : err.message);
-            toast.error("Signup Failed: " + (err.response?.data?.message || err.message));
-        } finally {
-            setLoading(false);
-        }
-    };
+      });
+    }
+    
+  } catch (err) {
+    console.error("Signup error:", err.response ? err.response.data : err.message);
+    toast.error("Signup Failed: " + (err.response?.data?.message || err.message));
+  } finally {
+    setLoading(false);
+  }
+};
 
     // ✅ ADD: Google Signup Handler
     const handleGoogleSignup = () => {

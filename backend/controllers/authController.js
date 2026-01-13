@@ -15,6 +15,9 @@ const transporter = nodemailer.createTransport({
 });
 
 
+// In your signup function in authController.js
+// Replace the email sending section with better error handling:
+
 const signup = async (req, res) => {
   const { firstName, lastName, phone, role, schoolName, schoolCode, email, password } = req.body;
 
@@ -62,27 +65,39 @@ const signup = async (req, res) => {
       // Don't fail the signup if activity logging fails
     }
 
-    // Build verification URL
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;    
-    const mailOptions = {
-      from: process.env.GMAIL_USER,
-      to: email,
-      subject: 'Verify Your Email Address',
-      html: `
-        <h2>Welcome to DBSL!</h2>
-        <p>Please click the link below to verify your email address:</p>
-        <a href="${verificationUrl}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px;">
-          Verify Email
-        </a>
-        <p>This link will expire in 24 hours.</p>
-      `
-    };
+    // ✅ ADD: Try to send verification email
+    try {
+      // Build verification URL
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`;    
+      const mailOptions = {
+        from: process.env.GMAIL_USER,
+        to: email,
+        subject: 'Verify Your Email Address',
+        html: `
+          <h2>Welcome to DBSL!</h2>
+          <p>Please click the link below to verify your email address:</p>
+          <a href="${verificationUrl}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px;">
+            Verify Email
+          </a>
+          <p>This link will expire in 24 hours.</p>
+          <p><small>If the button doesn't work, copy and paste this URL:</small></p>
+          <p><small>${verificationUrl}</small></p>
+        `
+      };
 
-    await transporter.sendMail(mailOptions);
-    
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ Verification email sent to ${email}`);
+      
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      // Don't fail the signup - allow resend later
+    }
 
-    res.json({ 
-      message: "User created. Please check your email to verify your account.",
+    // ✅ FIX: Return proper response with verification instructions
+    res.status(201).json({ 
+      success: true,
+      message: "Account created successfully! Please check your email to verify your account.",
+      needsVerification: true,
       user: { 
         _id: newUser._id, 
         email: newUser.email,
@@ -92,8 +107,11 @@ const signup = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error('Signup error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal server error during signup" 
+    });
   }
 };
 
