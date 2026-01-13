@@ -5,9 +5,22 @@ const crypto = require('crypto');
 
 console.log('🔐 Configuring passport Google OAuth...');
 
+// Debug environment variables
+console.log('🔐 Environment Check:');
+console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✓ Loaded' : '✗ MISSING');
+console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✓ Loaded' : '✗ MISSING');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'Not set');
+
+// Validate environment variables
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('❌ FATAL: Google OAuth credentials are missing!');
+    console.error('   Make sure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in .env file');
+    // Don't throw error during config, but passport will fail if used
+}
+
 const callbackURL = process.env.NODE_ENV === 'production'
     ? `${process.env.BACKEND_URL || 'https://dbsl.onrender.com'}/api/user/google/callback`
-    : 'http://localhost:5000/api/user/google/callback';
+    : process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/user/google/callback';
 
 console.log(`🔐 Using callback URL: ${callbackURL}`);
 
@@ -21,6 +34,7 @@ passport.use(
             proxy: true
         },
         async (req, accessToken, refreshToken, profile, done) => {
+            // ... rest of your strategy code remains the same ...
             try {
                 console.log('🔐 Google OAuth Profile:', {
                     id: profile.id,
@@ -28,7 +42,6 @@ passport.use(
                     name: profile.displayName
                 });
 
-                // Check if user exists by googleId or email
                 let user = await User.findOne({
                     $or: [
                         { googleId: profile.id },
@@ -37,7 +50,6 @@ passport.use(
                 });
 
                 if (user) {
-                    // If user exists but doesn't have googleId, update it
                     if (!user.googleId) {
                         user.googleId = profile.id;
                         user.profilePic = profile.photos?.[0]?.value || user.profilePic;
@@ -47,28 +59,21 @@ passport.use(
                     return done(null, user);
                 }
 
-                // Create a Google user WITHOUT placeholder values
-                // Just the minimal info from Google
                 const tempPassword = crypto.randomBytes(32).toString('hex');
-
-                console.log('🔐 Google profile picture URL:', profile.photos?.[0]?.value);
-                console.log('🔐 Profile photos array:', profile.photos);
                 
                 user = await User.create({
-    googleId: profile.id,
-    firstName: profile.name?.givenName || '',
-    lastName: profile.name?.familyName || '',
-    email: profile.emails?.[0]?.value || '',
-    profilePic: profile.photos?.[0]?.value || 'default-avatar.png',
-    password: tempPassword,
-    // Leave phone, schoolName, schoolCode undefined
-    isVerified: true,
-    signupMethod: 'google',
-    needsCompleteProfile: true
-});
+                    googleId: profile.id,
+                    firstName: profile.name?.givenName || '',
+                    lastName: profile.name?.familyName || '',
+                    email: profile.emails?.[0]?.value || '',
+                    profilePic: profile.photos?.[0]?.value || 'default-avatar.png',
+                    password: tempPassword,
+                    isVerified: true,
+                    signupMethod: 'google',
+                    needsCompleteProfile: true
+                });
 
                 console.log(`✅ Google user created (needs completion): ${user.email}`);
-                console.log(`   School fields: name="${user.schoolName}", code="${user.schoolCode}", phone="${user.phone}"`);
                 return done(null, user);
 
             } catch (error) {
@@ -78,8 +83,6 @@ passport.use(
         }
     )
 );
-
-console.log('✅ Google OAuth strategy configured successfully');
 
 console.log('✅ Google OAuth strategy configured successfully');
 

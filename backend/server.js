@@ -2,32 +2,37 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const connectDB = require('./config/db');
-require('./config/passport');  // This initializes Google strategy
 
-// ✅ CRITICAL: Debug before loading passport
+// ✅ CRITICAL: Load environment variables FIRST
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// ✅ CRITICAL: Debug environment variables BEFORE passport
 console.log('🚀 Starting server initialization...');
-console.log('🔍 Environment check:', {
-  NODE_ENV: process.env.NODE_ENV,
-  HAS_GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
-  HAS_GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET
-});
+console.log('🔍 Environment check:');
+console.log('   NODE_ENV:', process.env.NODE_ENV);
+console.log('   GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✓ Loaded' : '✗ MISSING');
+console.log('   GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✓ Loaded' : '✗ MISSING');
+console.log('   BACKEND_URL:', process.env.BACKEND_URL || 'Not set');
 
-// ✅ CRITICAL: Load passport configuration FIRST
-try {
-  require('./config/passport');  // This initializes Google strategy
-  console.log('✅ Passport config loaded successfully');
-} catch (error) {
-  console.error('❌ Failed to load passport config:', error.message);
+// ✅ Validate environment variables
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.error('❌ FATAL ERROR: Google OAuth credentials are missing!');
+  console.error('   Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env file');
+  process.exit(1);
 }
-const passport = require('passport');  // Then import passport
 
-require('dotenv').config();
+const connectDB = require('./config/db');
+const passport = require('passport');  // Import passport first
+
+// Now initialize passport configuration
+console.log('🔐 Loading passport configuration...');
+require('./config/passport');  // This uses the now-loaded environment variables
+console.log('✅ Passport config loaded successfully');
 
 const app = express();
 connectDB();
 
-// ✅ CRITICAL FIX: Global CORS middleware FIRST (before any routes)
+// ✅ CORS configuration (same as yours)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -37,17 +42,15 @@ const allowedOrigins = [
   'https://dbsl-liart.vercel.app'
 ];
 
-// ✅ Enhanced CORS config with credentials
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.warn('[CORS] Blocked origin:', origin);
-      callback(null, true); // Still allow for development
+      callback(null, true);
     }
   },
   credentials: true,
@@ -56,7 +59,7 @@ app.use(cors({
   exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
-// ✅ Additional security headers for images
+// Additional security headers
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -66,10 +69,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Body parsers
+// Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(passport.initialize())
+app.use(passport.initialize());
 
 app.options('/api/diagrams/:filename', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
