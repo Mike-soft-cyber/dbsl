@@ -7,10 +7,6 @@ const jwt = require('jsonwebtoken');
 //app.use('/api/user')
 router.post('/register', user.signup);
 router.post('/login', user.login);
-router.get('/verify-email', user.verifyEmail);
-router.post('/resend-verification', user.resendVerify);
-router.post('/complete-google-signup', user.completeGoogleSignup);
-router.post('/complete-google-profile', user.completeGoogleProfile);
 
 // Google OAuth routes
 router.get('/google', 

@@ -44,21 +44,23 @@ export default function Signup() {
 
   try {
     const res = await API.post('/user/register', formData);
-    const { success, message, user, needsVerification } = res.data;
+    const { success, message, token, user } = res.data;
 
     if (success) {
-      toast.success(message);
+      // ✅ Store token and user data immediately
+      localStorage.setItem('token', token);
+      localStorage.setItem('userData', JSON.stringify(user));
+      localStorage.setItem('teacherId', user._id);
+      localStorage.setItem('schoolName', user.schoolName);
+
+      toast.success(message || "Account created successfully!");
       
-      // ✅ Store user email for potential resend
-      localStorage.setItem('pendingVerificationEmail', formData.email);
-      
-      // ✅ Navigate to verification notice page
-      navigate('/verify-email', { 
-        state: { 
-          email: formData.email,
-          message: "Please check your email inbox and spam folder for the verification link."
-        }
-      });
+      // ✅ Redirect to appropriate dashboard immediately
+      if (user.role === 'Admin') {
+        navigate('/adminPages');
+      } else {
+        navigate('/dashboard');
+      }
     }
     
   } catch (err) {

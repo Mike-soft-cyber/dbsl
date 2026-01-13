@@ -1,4 +1,4 @@
-// model/User.js - Complete fix
+// model/User.js - Simplified version
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -6,18 +6,18 @@ const userSchema = new mongoose.Schema({
     lastName: { type: String, required: true, trim: true },
     phone: { 
         type: String, 
-        required: function() { return !this.googleId; }, // Only required for non-Google
+        required: function() { return !this.googleId; },
         unique: true,
-        sparse: true // Allows multiple null/undefined
+        sparse: true
     },
     role: { type: String, enum: ['Admin', 'Teacher'], default: 'Teacher' },
     schoolName: { 
         type: String, 
-        required: function() { return !this.googleId; } // Only required for non-Google
+        required: function() { return !this.googleId; }
     },
     schoolCode: { 
         type: String, 
-        required: function() { return !this.googleId; } // Only required for non-Google
+        required: function() { return !this.googleId; }
     },
     downloads: { type: Number, required: true, default: 0 },
     documentsCreated: { type: Number, required: true, default: 0 },
@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { 
         type: String, 
-        required: function() { return !this.googleId; } // Only required for non-Google
+        required: function() { return !this.googleId; }
     },
     googleId: { type: String, unique: true, sparse: true },
     profilePic: { type: String, default: 'default-avatar.png' },
@@ -58,12 +58,8 @@ const userSchema = new mongoose.Schema({
     },
     isVerified: { 
         type: Boolean, 
-        default: function() { 
-            return !!this.googleId; // Auto-verify Google users
-        } 
+        default: true // Set to true by default
     },
-    verificationToken: { type: String },
-    verificationExpires: { type: Date },
     signupMethod: { 
         type: String, 
         enum: ['email', 'google'], 
