@@ -10,6 +10,7 @@
 		"concurrently": "^9.2.0"
 	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "^0.71.2",
 		"mongoose": "^8.17.2",
 		"pdf-parse": "^1.1.1",
 		"react-markdown": "^10.1.0"

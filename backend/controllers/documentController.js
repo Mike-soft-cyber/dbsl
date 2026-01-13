@@ -1056,7 +1056,250 @@ exports.hasLinkedNotes = async (req, res) => {
   }
 };
 
+// ✅ FIXED: Enhanced extraction function that handles your specific table format
+function extractLearningConcepts(content) {
+  const concepts = [];
+  const seenConcepts = new Set();
+  const seenWeeks = new Set(); // Track unique weeks
+  
+  if (!content || typeof content !== 'string') {
+    console.warn('[ExtractConcepts] No content provided or content is not a string');
+    return { concepts: [], uniqueWeeks: [], weekCount: 0 };
+  }
+
+  console.log('[ExtractConcepts] Starting extraction from content');
+  console.log('[ExtractConcepts] Sample content:', content.substring(0, 300));
+
+  const lines = content.split('\n');
+  console.log(`[ExtractConcepts] Processing ${lines.length} lines of content`);
+  
+  let tableStarted = false;
+  let headerFound = false;
+  let headerColumns = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines
+    if (!line) continue;
+    
+    // Look for table header - FIXED to match your format
+    if (!headerFound && line.includes('|') && (
+        line.toLowerCase().includes('term') || 
+        line.toLowerCase().includes('week') || 
+        line.toLowerCase().includes('strand') ||
+        line.toLowerCase().includes('learning concept')
+    )) {
+      headerFound = true;
+      tableStarted = true;
+      headerColumns = line.split('|').map(c => c.trim()).filter(c => c);
+      console.log('[ExtractConcepts] Found table header:', headerColumns);
+      console.log('[ExtractConcepts] Header columns count:', headerColumns.length);
+      continue;
+    }
+    
+    // Skip separator lines (---)
+    if (line.match(/^[\|\s-:]*$/)) {
+      continue;
+    }
+    
+    // Process data rows after header is found
+    if (tableStarted && line.includes('|')) {
+      const rawCells = line.split('|');
+      const cells = rawCells.map(c => c.trim());
+      
+      console.log(`[ExtractConcepts] Raw cells: [${cells.join('], [')}]`);
+      console.log(`[ExtractConcepts] Cells count: ${cells.length}`);
+      
+      // Handle your specific table format:
+      // | Term | | Week | Strand | Sub-strand | Learning Concept |
+      // Index: 0     1     2        3           4                 5
+      
+      let term = '';
+      let week = '';
+      let strand = '';
+      let substrand = '';
+      let concept = '';
+      
+      // Try to find data in different positions
+      for (let j = 0; j < cells.length; j++) {
+        const cell = cells[j];
+        if (!cell) continue;
+        
+        // Check if cell contains "Term"
+        if (cell.toLowerCase().includes('term') && cell.toLowerCase().includes('1')) {
+          term = cell;
+          continue;
+        }
+        
+        // Check if cell contains "Week"
+        if (cell.toLowerCase().includes('week')) {
+          week = cell;
+          continue;
+        }
+        
+        // Check if cell contains the strand (might be in position 3)
+        if (j >= 2 && j <= 3 && cell.length > 5 && !cell.toLowerCase().includes('week')) {
+          if (!strand) {
+            strand = cell;
+          } else if (!substrand) {
+            substrand = cell;
+          }
+          continue;
+        }
+        
+        // Learning concept is usually the last meaningful cell
+        if (cell.length > 10 && 
+            !cell.toLowerCase().includes('term') &&
+            !cell.toLowerCase().includes('week') &&
+            !cell.toLowerCase().includes('strand') &&
+            !cell.toLowerCase().includes('sub-strand') &&
+            !cell.toLowerCase().includes('learning concept')) {
+          concept = cell;
+        }
+      }
+      
+      // ✅ FIXED: Extract week number from week cell
+      let weekNumber = null;
+      if (week) {
+        const weekMatch = week.match(/week\s*(\d+)/i);
+        if (weekMatch) {
+          weekNumber = parseInt(weekMatch[1]);
+          seenWeeks.add(weekNumber);
+        }
+      }
+      
+      // Validate extracted data
+      if (week && concept && concept.length > 5) {
+        const conceptKey = `${week}-${concept}`.toLowerCase().trim();
+        
+        if (!seenConcepts.has(conceptKey)) {
+          seenConcepts.add(conceptKey);
+          concepts.push({
+            term: term || 'Term 1',
+            week: week,
+            weekNumber: weekNumber,
+            strand: strand || '',
+            substrand: substrand || '',
+            concept: concept
+          });
+          console.log(`[ExtractConcepts] ✅ Added concept: Week ${weekNumber} - "${concept.substring(0, 50)}..."`);
+        }
+      }
+    }
+    
+    // Stop processing if we've processed too many rows
+    if (concepts.length >= 100) {
+      break;
+    }
+  }
+  
+  // If no concepts found with primary method, try fallback
+  if (concepts.length === 0) {
+    console.log('[ExtractConcepts] Trying fallback extraction...');
+    return extractLearningConceptsFallback(content);
+  }
+  
+  console.log(`[ExtractConcepts] Extraction complete: ${concepts.length} unique concepts found in ${seenWeeks.size} unique weeks`);
+  
+  // Log what we found
+  if (concepts.length > 0) {
+    console.log('[ExtractConcepts] First few concepts:');
+    concepts.slice(0, 5).forEach((c, i) => {
+      console.log(`  ${i + 1}. ${c.week}: ${c.concept.substring(0, 50)}...`);
+    });
+  }
+  
+  return {
+    concepts: concepts,
+    uniqueWeeks: Array.from(seenWeeks).sort((a, b) => a - b),
+    weekCount: seenWeeks.size
+  };
+}
+
+// Fallback extraction for alternative formats
+function extractLearningConceptsFallback(content) {
+  const concepts = [];
+  const seenWeeks = new Set();
+  
+  console.log('[ExtractConceptsFallback] Starting fallback extraction');
+  
+  const lines = content.split('\n');
+  let currentWeek = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Look for "Week X" pattern
+    const weekMatch = line.match(/week\s*(\d+)/i);
+    if (weekMatch) {
+      currentWeek = parseInt(weekMatch[1]);
+      seenWeeks.add(currentWeek);
+      
+      // Try to extract concept from same line
+      const afterWeek = line.substring(weekMatch.index + weekMatch[0].length).trim();
+      if (afterWeek && afterWeek.length > 10 && afterWeek.includes('|')) {
+        const parts = afterWeek.split('|').map(p => p.trim()).filter(p => p);
+        if (parts.length > 0 && !parts[0].toLowerCase().includes('strand')) {
+          const concept = parts[parts.length - 1];
+          if (concept.length > 10) {
+            concepts.push({
+              term: 'Term 1',
+              week: `Week ${currentWeek}`,
+              weekNumber: currentWeek,
+              strand: '',
+              substrand: '',
+              concept: concept
+            });
+            console.log(`[ExtractConceptsFallback] ✅ Added from same line: Week ${currentWeek} - "${concept.substring(0, 50)}..."`);
+          }
+        }
+      }
+      continue;
+    }
+    
+    // If we have a current week and line looks like a concept
+    if (currentWeek && line.includes('|') && !line.match(/^[\|\s-:]*$/)) {
+      const cells = line.split('|').map(c => c.trim()).filter(c => c);
+      if (cells.length >= 1) {
+        const lastCell = cells[cells.length - 1];
+        if (lastCell && lastCell.length > 10 && 
+            !lastCell.toLowerCase().includes('learning concept') &&
+            !lastCell.toLowerCase().includes('please regenerate')) {
+          
+          // Check if this is a duplicate
+          const conceptKey = `Week ${currentWeek}-${lastCell}`.toLowerCase().trim();
+          const isDuplicate = concepts.some(c => 
+            `${c.week}-${c.concept}`.toLowerCase() === conceptKey
+          );
+          
+          if (!isDuplicate) {
+            concepts.push({
+              term: 'Term 1',
+              week: `Week ${currentWeek}`,
+              weekNumber: currentWeek,
+              strand: '',
+              substrand: '',
+              concept: lastCell
+            });
+            console.log(`[ExtractConceptsFallback] ✅ Added from table row: Week ${currentWeek} - "${lastCell.substring(0, 50)}..."`);
+          }
+        }
+      }
+    }
+  }
+  
+  console.log(`[ExtractConceptsFallback] Fallback found ${concepts.length} concepts in ${seenWeeks.size} weeks`);
+  
+  return {
+    concepts: concepts,
+    uniqueWeeks: Array.from(seenWeeks).sort((a, b) => a - b),
+    weekCount: seenWeeks.size
+  };
+}
+
 // Generate comprehensive lesson notes from entire breakdown - FIXED GENERATOR USAGE
+// ✅ FIXED: Generate comprehensive lesson notes from entire breakdown
 exports.generateLinkedNotesFromBreakdown = async (req, res) => {
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1080,8 +1323,26 @@ exports.generateLinkedNotesFromBreakdown = async (req, res) => {
 
     // Parse learning concepts from breakdown content
     console.log(`[${requestId}] Extracting learning concepts...`);
-    const learningConcepts = extractLearningConcepts(breakdownDoc.content);
+    const extractionResult = extractLearningConcepts(breakdownDoc.content);
+    const learningConcepts = extractionResult.concepts;
+    let actualWeekCount = extractionResult.weekCount;
     
+    // ✅ MANUAL FIX: If week count is 0, use Term-based defaults
+    if (actualWeekCount === 0) {
+      console.log(`[${requestId}] ⚠️ No weeks detected, using term-based default`);
+      const termNumber = breakdownDoc.term?.replace('Term ', '').replace('term', '');
+      if (termNumber === '1') {
+        actualWeekCount = 10; // Term 1 has 10 weeks
+      } else if (termNumber === '2') {
+        actualWeekCount = 11; // Term 2 has 11 weeks
+      } else if (termNumber === '3') {
+        actualWeekCount = 6; // Term 3 has 6 weeks
+      } else {
+        actualWeekCount = 10; // Default to 10 weeks
+      }
+      console.log(`[${requestId}] Using default weeks for ${breakdownDoc.term}: ${actualWeekCount}`);
+    }
+
     // ✅ FIX 1: Better duplicate detection and validation
     const uniqueConcepts = [];
     const seenKeys = new Set();
@@ -1094,14 +1355,30 @@ exports.generateLinkedNotesFromBreakdown = async (req, res) => {
       }
     });
 
-    console.log(`[${requestId}] Extracted ${learningConcepts.length} concepts, ${uniqueConcepts.length} unique`);
+    console.log(`[${requestId}] Extracted ${learningConcepts.length} concepts, ${uniqueConcepts.length} unique in ${actualWeekCount} weeks`);
 
     // ✅ FIX 2: Validate we have concepts before proceeding
     if (uniqueConcepts.length === 0) {
-      return res.status(400).json({ 
-        error: 'No learning concepts found',
-        message: 'Could not extract valid learning concepts from the breakdown document. Please ensure the breakdown contains a properly formatted table with learning concepts.'
-      });
+      // Try one more time with a simpler extraction
+      console.log(`[${requestId}] Trying direct extraction from content...`);
+      const directConcepts = extractDirectConcepts(breakdownDoc.content);
+      if (directConcepts.length > 0) {
+        directConcepts.forEach(concept => {
+          const key = `${concept.week}-${concept.concept}`.toLowerCase().trim();
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueConcepts.push(concept);
+          }
+        });
+        console.log(`[${requestId}] Direct extraction found ${directConcepts.length} concepts`);
+      }
+      
+      if (uniqueConcepts.length === 0) {
+        return res.status(400).json({ 
+          error: 'No learning concepts found',
+          message: 'Could not extract valid learning concepts from the breakdown document. Please ensure your Lesson Concept Breakdown contains a table with learning concepts.'
+        });
+      }
     }
 
     // Check if notes already exist
@@ -1135,13 +1412,13 @@ exports.generateLinkedNotesFromBreakdown = async (req, res) => {
       substrand: breakdownDoc.substrand,
       term: breakdownDoc.term,
       teacher: req.user?._id || breakdownDoc.teacher,
-      weeks: uniqueConcepts.length, // Use actual concept count
+      weeks: actualWeekCount || 10, // ✅ Use actual week count, not concept count
       lessonsPerWeek: 5,
       learningConcepts: uniqueConcepts, // ✅ Pass validated, unique concepts
       sourceLessonConceptId: breakdownDoc._id
     };
 
-    console.log(`[${requestId}] Request data prepared with ${uniqueConcepts.length} unique concepts`);
+    console.log(`[${requestId}] Request data prepared with ${uniqueConcepts.length} unique concepts across ${requestData.weeks} weeks`);
 
     // ✅ FIX 4: Generate using DocumentGeneratorFactory with proper error handling
     let generatedDocument;
@@ -1208,31 +1485,32 @@ exports.generateLinkedNotesFromBreakdown = async (req, res) => {
 
     // ✅ FIX 7: Return clean response
     res.status(201).json({
-  success: true,
-  document: {
-    _id: generatedDocument._id,
-    type: generatedDocument.type,
-    grade: generatedDocument.grade,
-    subject: generatedDocument.subject,
-    strand: generatedDocument.strand,
-    substrand: generatedDocument.substrand,
-    term: generatedDocument.term,
-    content: generatedDocument.content,
-    status: generatedDocument.status,
-    parentDocument: generatedDocument.parentDocument,
-    diagrams: generatedDocument.diagrams || [],
-    createdAt: generatedDocument.createdAt
-  },
-  documentId: generatedDocument._id, // ✅ Add this for easy access
-  metadata: {
-    requestId,
-    generationTime: totalTime,
-    conceptCount: uniqueConcepts.length,
-    diagramCount: generatedDocument.diagrams?.length || 0
-  },
-  message: 'Lesson notes generated successfully',
-  redirectUrl: `/documents/${generatedDocument._id}` // ✅ Optional: explicit redirect URL
-});
+      success: true,
+      document: {
+        _id: generatedDocument._id,
+        type: generatedDocument.type,
+        grade: generatedDocument.grade,
+        subject: generatedDocument.subject,
+        strand: generatedDocument.strand,
+        substrand: generatedDocument.substrand,
+        term: generatedDocument.term,
+        content: generatedDocument.content,
+        status: generatedDocument.status,
+        parentDocument: generatedDocument.parentDocument,
+        diagrams: generatedDocument.diagrams || [],
+        createdAt: generatedDocument.createdAt
+      },
+      documentId: generatedDocument._id, // ✅ Add this for easy access
+      metadata: {
+        requestId,
+        generationTime: totalTime,
+        conceptCount: uniqueConcepts.length,
+        weekCount: requestData.weeks,
+        diagramCount: generatedDocument.diagrams?.length || 0
+      },
+      message: 'Lesson notes generated successfully',
+      redirectUrl: `/documents/${generatedDocument._id}` // ✅ Optional: explicit redirect URL
+    });
 
   } catch (error) {
     const totalTime = Date.now() - startTime;
@@ -1248,362 +1526,30 @@ exports.generateLinkedNotesFromBreakdown = async (req, res) => {
   }
 };
 
-// ✅ FIX 9: Enhanced extraction function with better validation
-function extractLearningConcepts(content) {
-  const concepts = [];
-  const seenConcepts = new Set(); // Track duplicates
-  
-  if (!content || typeof content !== 'string') {
-    console.warn('[ExtractConcepts] No content provided or content is not a string');
-    return concepts;
-  }
-
-  console.log('[ExtractConcepts] Starting extraction from content');
-
-  const lines = content.split('\n');
-  console.log(`[ExtractConcepts] Processing ${lines.length} lines of content`);
-  
-  let tableStarted = false;
-  let headerFound = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines
-    if (!line) continue;
-    
-    // Look for table header
-    if (!headerFound && line.includes('|') && (
-        line.toLowerCase().includes('term') || 
-        line.toLowerCase().includes('week') || 
-        line.toLowerCase().includes('learning concept')
-    )) {
-      headerFound = true;
-      tableStarted = true;
-      console.log('[ExtractConcepts] Found table header at line', i);
-      continue;
-    }
-    
-    // Skip separator lines (---)
-    if (line.match(/^[\|\s-:]*$/)) {
-      continue;
-    }
-    
-    // Process data rows after header is found
-    if (tableStarted && line.includes('|')) {
-      const cells = line.split('|')
-        .map(c => c.trim())
-        .filter(c => c && c !== '');
-      
-      // Expected format: | Term | Week | Strand | Sub-strand | Learning Concept |
-      if (cells.length >= 5) {
-        const term = cells[0];
-        const week = cells[1];
-        const concept = cells[4];
-        
-        // ✅ Validate it's a real data row with proper content
-        const isValidRow = 
-          concept && 
-          concept.length > 10 && 
-          week && week.toLowerCase().includes('week') &&
-          !concept.toLowerCase().includes('learning concept') &&
-          !concept.toLowerCase().includes('strand') &&
-          !concept.toLowerCase().includes('sub-strand') &&
-          !concept.toLowerCase().includes('please regenerate');
-        
-        if (isValidRow) {
-          // Create a unique key to check for duplicates
-          const conceptKey = `${week}-${concept}`.toLowerCase().trim();
-          
-          if (!seenConcepts.has(conceptKey)) {
-            seenConcepts.add(conceptKey);
-            concepts.push({
-              term: term || 'Term 1',
-              week: week,
-              concept: concept
-            });
-            console.log(`[ExtractConcepts] ✅ Added unique concept: "${concept.substring(0, 50)}..."`);
-          } else {
-            console.log(`[ExtractConcepts] ⚠️ Skipped duplicate: "${concept.substring(0, 30)}..."`);
-          }
-        }
-      }
-    }
-    
-    // Stop processing if we hit a non-table line after the table
-    if (tableStarted && !line.includes('|') && line.length > 10) {
-      console.log('[ExtractConcepts] Reached end of table');
-      break;
-    }
-  }
-  
-  console.log(`[ExtractConcepts] Extraction complete: ${concepts.length} unique concepts found`);
-  
-  return concepts;
-}
-
-// Helper function stays the same
-function extractLearningConcepts(content) {
-  const concepts = [];
-  const seenConcepts = new Set(); // Track seen concepts to avoid duplicates
-  
-  if (!content || typeof content !== 'string') {
-    console.warn('[ExtractConcepts] No content provided or content is not a string');
-    return concepts;
-  }
-
-  console.log('[ExtractConcepts] Starting extraction from content');
-
-  const lines = content.split('\n');
-  console.log(`[ExtractConcepts] Processing ${lines.length} lines of content`);
-  
-  let tableStarted = false;
-  let headerFound = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines
-    if (!line) continue;
-    
-    // Look for table header
-    if (!headerFound && line.includes('|') && (
-        line.toLowerCase().includes('term') && 
-        line.toLowerCase().includes('week') && 
-        line.toLowerCase().includes('concept')
-    )) {
-      headerFound = true;
-      tableStarted = true;
-      console.log('[ExtractConcepts] Found table header, starting data extraction');
-      continue;
-    }
-    
-    // Skip separator lines (---)
-    if (line.match(/^[\|\s-]*$/)) {
-      continue;
-    }
-    
-    // Process data rows after header is found
-    if (tableStarted && line.includes('|')) {
-      const cells = line.split('|')
-        .map(c => c.trim())
-        .filter(c => c && c !== '');
-      
-      // Expected format: | Term | Week | Strand | Sub-strand | Learning Concept |
-      if (cells.length >= 5) {
-        const term = cells[0];
-        const week = cells[1];
-        const concept = cells[4];
-        
-        // Validate it's a real data row
-        if (concept && 
-            concept.length > 10 && 
-            week.toLowerCase().includes('week') &&
-            !concept.toLowerCase().includes('learning concept') &&
-            !concept.toLowerCase().includes('strand') &&
-            !concept.toLowerCase().includes('sub-strand')) {
-          
-          // Create a unique key to check for duplicates
-          const conceptKey = `${week}-${concept}`.toLowerCase();
-          
-          if (!seenConcepts.has(conceptKey)) {
-            seenConcepts.add(conceptKey);
-            concepts.push({
-              term: term || 'Term 1',
-              week: week,
-              concept: concept
-            });
-            console.log(`[ExtractConcepts] ✅ Added concept: "${concept.substring(0, 50)}..."`);
-          } else {
-            console.log(`[ExtractConcepts] ⚠️ Skipped duplicate: "${concept}"`);
-          }
-        }
-      }
-    }
-    
-    // Stop processing if we hit a non-table line after the table
-    if (tableStarted && !line.includes('|') && line.length > 10) {
-      tableStarted = false;
-    }
-  }
-  
-  console.log(`[ExtractConcepts] Extraction complete: ${concepts.length} unique concepts found`);
-  
-  // Log the extracted concepts for debugging
-  if (concepts.length > 0) {
-    console.log('[ExtractConcepts] Extracted concepts:');
-    concepts.forEach((c, i) => {
-      console.log(`  ${i + 1}. ${c.week}: ${c.concept.substring(0, 60)}...`);
-    });
-  }
-  
-  return concepts;
-}
-
-// Helper function to extract learning concepts from breakdown content
-function extractLearningConcepts(content) {
-  const concepts = [];
-  
-  if (!content || typeof content !== 'string') {
-    console.warn('[ExtractConcepts] No content provided or content is not a string');
-    return concepts;
-  }
-
-  console.log('[ExtractConcepts] Starting extraction from content:', content.substring(0, 200) + '...');
-
-  const lines = content.split('\n');
-  console.log(`[ExtractConcepts] Processing ${lines.length} lines of content`);
-  
-  let tableStarted = false;
-  let headerFound = false;
-  let headerColumns = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines
-    if (!line) continue;
-    
-    // Look for table header
-    if (!headerFound && line.includes('|') && (
-        line.toLowerCase().includes('term') || 
-        line.toLowerCase().includes('week') || 
-        line.toLowerCase().includes('strand') ||
-        line.toLowerCase().includes('concept')
-    )) {
-      headerFound = true;
-      tableStarted = true;
-      headerColumns = line.split('|').map(c => c.trim()).filter(c => c);
-      console.log('[ExtractConcepts] Found table header:', headerColumns);
-      continue;
-    }
-    
-    // Skip separator lines (---)
-    if (line.match(/^[\|\s-]*$/)) {
-      continue;
-    }
-    
-    // Process data rows after header is found
-    if (tableStarted && line.includes('|')) {
-      const cells = line.split('|')
-        .map(c => c.trim())
-        .filter(c => c && c !== '');
-      
-      console.log('[ExtractConcepts] Processing row:', cells);
-      
-      // Try different column configurations
-      if (cells.length >= 3) {
-        let term, week, concept;
-        
-        // Configuration 1: | Term | Week | Strand | Sub-strand | Learning Concept |
-        if (cells.length >= 5) {
-          term = cells[0];
-          week = cells[1];
-          concept = cells[4];
-        }
-        // Configuration 2: | Week | Strand | Sub-strand | Learning Concept |
-        else if (cells.length >= 4) {
-          term = 'Term 1'; // Default term
-          week = cells[0];
-          concept = cells[3];
-        }
-        // Configuration 3: | Week | Learning Concept |
-        else if (cells.length >= 2) {
-          term = 'Term 1'; // Default term
-          week = cells[0];
-          concept = cells[1];
-        }
-        
-        // Validate concept
-        if (concept && concept.length > 5) {
-          // Skip header-like rows
-          const isHeaderLike = 
-            concept.toLowerCase().includes('learning concept') ||
-            concept.toLowerCase().includes('strand') ||
-            concept.toLowerCase().includes('sub-strand') ||
-            concept.toLowerCase().includes('term') ||
-            concept.toLowerCase().includes('week');
-          
-          // Check if it's a valid week format
-          const isWeekFormat = 
-            week.toLowerCase().includes('week') ||
-            week.match(/week\s*\d+/i) ||
-            week.match(/\d+/);
-          
-          if (!isHeaderLike && isWeekFormat) {
-            console.log(`[ExtractConcepts] ✅ Valid concept found: "${concept.substring(0, 50)}..."`);
-            concepts.push({
-              term: term || 'Term 1',
-              week: week,
-              concept: concept
-            });
-          } else {
-            console.log(`[ExtractConcepts] ❌ Skipped row - header-like or invalid week:`, { concept, week, isHeaderLike, isWeekFormat });
-          }
-        } else {
-          console.log(`[ExtractConcepts] ❌ Skipped row - concept too short:`, concept);
-        }
-      }
-    }
-    
-    // Stop processing if we hit a non-table line after the table
-    if (tableStarted && !line.includes('|') && line.length > 10) {
-      tableStarted = false;
-    }
-  }
-  
-  console.log(`[ExtractConcepts] Extraction complete: ${concepts.length} concepts found`);
-  
-  // If no concepts found with table parsing, try alternative parsing
-  if (concepts.length === 0) {
-    console.log('[ExtractConcepts] Trying alternative parsing method...');
-    const alternativeConcepts = extractLearningConceptsAlternative(content);
-    concepts.push(...alternativeConcepts);
-    console.log(`[ExtractConcepts] Alternative method found: ${alternativeConcepts.length} concepts`);
-  }
-  
-  return concepts;
-}
-
-// Alternative parsing method for different content formats
-function extractLearningConceptsAlternative(content) {
+// Simple direct extraction for debugging
+function extractDirectConcepts(content) {
   const concepts = [];
   const lines = content.split('\n');
   
-  // Look for learning concepts in various formats
   for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    // Skip empty lines and obvious headers
-    if (!trimmedLine || 
-        trimmedLine.includes('---') ||
-        trimmedLine.toLowerCase().includes('term') && trimmedLine.toLowerCase().includes('week')) {
-      continue;
-    }
-    
-    // Pattern 1: Lines that contain "Week X" and meaningful content
-    const weekMatch = trimmedLine.match(/(week\s*\d+)/i);
-    if (weekMatch && trimmedLine.length > 20) {
-      const concept = trimmedLine.replace(weekMatch[0], '').trim();
-      if (concept.length > 10) {
-        concepts.push({
-          term: 'Term 1',
-          week: weekMatch[0],
-          concept: concept
-        });
+    if (line.includes('Week') && line.includes('|')) {
+      const parts = line.split('|').map(p => p.trim()).filter(p => p);
+      if (parts.length >= 2) {
+        const weekMatch = parts[0].match(/week\s*(\d+)/i);
+        if (weekMatch) {
+          const weekNumber = parseInt(weekMatch[1]);
+          // The last part is usually the concept
+          const lastPart = parts[parts.length - 1];
+          if (lastPart && lastPart.length > 10) {
+            concepts.push({
+              term: 'Term 1',
+              week: `Week ${weekNumber}`,
+              weekNumber: weekNumber,
+              concept: lastPart
+            });
+          }
+        }
       }
-    }
-    
-    // Pattern 2: Numbered items that might be weekly concepts
-    const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
-    if (numberedMatch && trimmedLine.length > 15) {
-      const weekNum = numberedMatch[1];
-      const concept = numberedMatch[2];
-      concepts.push({
-        term: 'Term 1',
-        week: `Week ${weekNum}`,
-        concept: concept
-      });
     }
   }
   

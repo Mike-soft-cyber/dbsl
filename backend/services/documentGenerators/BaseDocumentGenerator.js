@@ -1,17 +1,94 @@
-// BaseDocumentGenerator.js - SIMPLIFIED WITHOUT DIAGRAMS
+// BaseDocumentGenerator.js - COMPLETE FIXED VERSION
 const { OpenAI } = require("openai");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 180000,
-  maxRetries: 0
-});
-
 class BaseDocumentGenerator {
-  constructor(type) {
+  constructor(type, config = {}) {
     this.type = type;
     this.maxRetries = 3;
     this.timeoutMs = 180000;
+    
+    // Default to OpenAI if nothing specified
+    this.aiProvider = config.aiProvider || process.env.AI_PROVIDER || 'openai';
+    
+    console.log(`[${this.type}] Using AI Provider: ${this.aiProvider}`);
+    
+    this.initializeAIClient();
+  }
+
+  initializeAIClient() {
+    console.log(`[${this.type}] Initializing ${this.aiProvider} client...`);
+    
+    switch (this.aiProvider) {
+      case 'openai':
+        const { OpenAI } = require("openai");
+        
+        if (!process.env.OPENAI_API_KEY) {
+          throw new Error('OPENAI_API_KEY not found in environment variables');
+        }
+        
+        this.client = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          timeout: 180000,
+          maxRetries: 0
+        });
+        
+        this.model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+        console.log(`[${this.type}] OpenAI model: ${this.model}`);
+        break;
+
+      case 'anthropic':
+      const { Anthropic } = require("@anthropic-ai/sdk");
+      this.client = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY
+      });
+      
+      // CLAUDE 4.X MODELS - Use these!
+      const claude4Models = [
+        'claude-4-haiku-20241022',
+        'claude-4-sonnet-20241022',
+        'claude-4.5-sonnet-20241022',
+        'claude-4-opus-20241022'
+      ];
+      
+      // Try the one from env, or use Claude 4 Haiku (cheapest/fastest)
+      const envModel = process.env.ANTHROPIC_MODEL;
+      if (envModel && claude4Models.includes(envModel)) {
+        this.model = envModel;
+      } else {
+        this.model = 'claude-4-haiku-20241022'; // Default to Claude 4 Haiku
+        console.log(`[${this.type}] Using Claude 4 model: ${this.model}`);
+      }
+      break;
+
+      case 'google':
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        this.client = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+        this.model = process.env.GOOGLE_MODEL || "gemini-pro";
+        break;
+
+      case 'ollama':
+        // For local Ollama
+        const { OpenAI: OllamaOpenAI } = require("openai");
+        this.client = new OllamaOpenAI({
+          baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
+          apiKey: "ollama" // Not needed for Ollama
+        });
+        this.model = process.env.OLLAMA_MODEL || "llama2";
+        break;
+
+      case 'azure':
+        const { AzureOpenAI } = require("openai");
+        this.client = new AzureOpenAI({
+          apiKey: process.env.AZURE_OPENAI_KEY,
+          endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+          apiVersion: "2023-12-01-preview"
+        });
+        this.model = process.env.AZURE_OPENAI_MODEL || "gpt-4";
+        break;
+
+      default:
+        throw new Error(`Unsupported AI provider: ${this.aiProvider}`);
+    }
   }
 
   async generate(requestData, cbcEntry) {
@@ -137,9 +214,8 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
 
   async callAI(prompt) {
     try {
-      if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'undefined') {
-        throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in your .env file');
-      }
+      // Check API key based on provider
+      this.validateAPIKey();
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -148,29 +224,63 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
       }, this.timeoutMs);
 
       try {
-        const model = "gpt-4o-mini";
-        
-        console.log(`[${this.type}] Calling ${model}...`);
+        console.log(`[${this.type}] Calling ${this.aiProvider} (${this.model})...`);
         console.log(`[${this.type}] Prompt length: ${prompt.length} chars`);
+
+        let response;
         
-        const response = await client.chat.completions.create({
-          model: model,
-          messages: [
-            { 
-              role: "system", 
-              content: this.getSystemMessage() 
-            },
-            { 
-              role: "user", 
-              content: prompt 
-            }
-          ],
-          temperature: 0.3,
-          max_completion_tokens: 8000,
-          stream: false
-        }, {
-          signal: controller.signal
-        });
+        switch (this.aiProvider) {
+          case 'openai':
+          case 'azure':
+          case 'ollama':
+            response = await this.client.chat.completions.create({
+              model: this.model,
+              messages: [
+                { role: "system", content: this.getSystemMessage() },
+                { role: "user", content: prompt }
+              ],
+              temperature: 0.3,
+              max_tokens: 8000,
+              stream: false
+            }, { signal: controller.signal });
+            break;
+
+          case 'anthropic':
+            response = await this.client.messages.create({
+              model: this.model,
+              max_tokens: 8000,
+              messages: [
+                { role: "user", content: prompt }
+              ],
+              temperature: 0.3,
+              system: this.getSystemMessage()
+            });
+            // Format to match OpenAI response structure
+            response = {
+              choices: [{
+                message: {
+                  content: response.content[0].text
+                }
+              }]
+            };
+            break;
+
+          case 'google':
+            const genAI = this.client;
+            const model = genAI.getGenerativeModel({ model: this.model });
+            const result = await model.generateContent([
+              this.getSystemMessage(),
+              prompt
+            ].join("\n\n"));
+            response = {
+              choices: [{
+                message: {
+                  content: result.response.text()
+                }
+              }]
+            };
+            break;
+        }
 
         clearTimeout(timeoutId);
         
@@ -184,29 +294,69 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
 
       } catch (error) {
         clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError' || error.message.includes('aborted')) {
-          throw new Error(`Request timeout after ${this.timeoutMs}ms - try reducing prompt size`);
-        }
-        
-        throw error;
+        this.handleAIError(error);
       }
 
     } catch (error) {
-      if (error.code === 'insufficient_quota') {
-        throw new Error('OpenAI API quota exceeded. Please add credits at: https://platform.openai.com/billing');
-      }
-      if (error.code === 'invalid_api_key') {
-        throw new Error('Invalid OpenAI API key. Please check your .env file');
-      }
-      if (error.status === 429) {
-        throw new Error('OpenAI rate limit exceeded. Please wait and try again.');
-      }
-      
-      throw new Error(`AI service error: ${error.message}`);
+      throw error;
     }
   }
 
+  validateAPIKey() {
+    const envVars = {
+      'openai': 'OPENAI_API_KEY',
+      'anthropic': 'ANTHROPIC_API_KEY',
+      'google': 'GOOGLE_API_KEY',
+      'azure': 'AZURE_OPENAI_KEY',
+      'ollama': null // No API key needed
+    };
+
+    const envVar = envVars[this.aiProvider];
+    if (envVar && (!process.env[envVar] || process.env[envVar] === 'undefined')) {
+      throw new Error(`${this.aiProvider.toUpperCase()} API key not configured. Please set ${envVar} in your .env file`);
+    }
+  }
+
+  handleAIError(error) {
+    if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      throw new Error(`Request timeout after ${this.timeoutMs}ms - try reducing prompt size`);
+    }
+
+    const providerErrors = {
+      'openai': {
+        'insufficient_quota': 'OpenAI API quota exceeded. Please add credits at: https://platform.openai.com/billing',
+        'invalid_api_key': 'Invalid OpenAI API key. Please check your .env file',
+        '429': 'OpenAI rate limit exceeded. Please wait and try again.'
+      },
+      'anthropic': {
+        'invalid_api_key': 'Invalid Anthropic API key.',
+        '429': 'Anthropic rate limit exceeded.'
+      },
+      'google': {
+        'INVALID_ARGUMENT': 'Invalid Google AI API key or configuration.',
+        'RESOURCE_EXHAUSTED': 'Google AI quota exceeded.'
+      },
+      'azure': {
+        '429': 'Azure OpenAI rate limit exceeded.',
+        '401': 'Invalid Azure OpenAI API key.'
+      }
+    };
+
+    const errors = providerErrors[this.aiProvider] || {};
+    const errorCode = error.code || error.status || '';
+    
+    if (errors[errorCode]) {
+      throw new Error(errors[errorCode]);
+    }
+
+    if (error.message) {
+      throw new Error(`${this.aiProvider.toUpperCase()} error: ${error.message}`);
+    }
+
+    throw new Error(`AI service error: ${error.toString()}`);
+  }
+
+  // Abstract method - must be implemented by subclasses
   createPrompt(requestData, cbcEntry) {
     throw new Error('createPrompt must be implemented in subclass');
   }

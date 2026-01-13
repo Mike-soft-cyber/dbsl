@@ -1,5 +1,4 @@
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium')
+const puppeteer = require('puppeteer');
 const mongoose = require('mongoose');
 const fs = require('fs').promises;
 const path = require('path');
@@ -327,7 +326,7 @@ exports.generatePDF = async (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    console.log('[PDF] âœ… Document found:', doc.type);
+    console.log('[PDF] ✅ Document found:', doc.type);
     console.log('[PDF] Content length:', doc.content?.length || 0);
     console.log('[PDF] Diagrams:', doc.diagrams?.length || 0);
 
@@ -335,7 +334,7 @@ exports.generatePDF = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     console.log('[PDF] Base URL:', baseUrl);
     
-    // âœ… FIX 3: Process content to use stored base64 from diagrams array
+    // Process content to use stored base64 from diagrams array
     let contentForPdf = doc.content || '';
     
     // Replace diagram file paths with base64 from stored diagrams
@@ -344,13 +343,11 @@ exports.generatePDF = async (req, res) => {
       
       doc.diagrams.forEach((diagram, index) => {
         if (diagram.imageData) {
-          // Find references to this diagram in the content
           const filenamePattern = diagram.fileName || `diagram-${index + 1}.png`;
           const pathPattern = `/api/diagrams/${filenamePattern}`;
           
           console.log('[PDF] Replacing', pathPattern, 'with base64 data');
           
-          // Replace file path references with base64
           contentForPdf = contentForPdf.replace(
             new RegExp(`!\\[(.*?)\\]\\(${pathPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g'),
             `![$1](${diagram.imageData})`
@@ -358,15 +355,13 @@ exports.generatePDF = async (req, res) => {
         }
       });
       
-      console.log('[PDF] âœ… Diagram replacement complete');
+      console.log('[PDF] ✅ Diagram replacement complete');
     }
 
-    const isProduction = process.env.NODE_ENV === 'production';
-    
     // Try to convert any remaining non-base64 images
     try {
       contentForPdf = await convertImagesToBase64(contentForPdf, baseUrl);
-      console.log('[PDF] âœ… Additional image conversion complete');
+      console.log('[PDF] ✅ Additional image conversion complete');
     } catch (imageError) {
       console.warn('[PDF] ⚠️ Some image conversions failed:', imageError.message);
     }
@@ -374,25 +369,42 @@ exports.generatePDF = async (req, res) => {
     // Convert to HTML
     console.log('[PDF] Converting to HTML...');
     const contentHtml = markdownToHtml(contentForPdf, baseUrl, doc.type);
-    console.log('[PDF] âœ… HTML ready:', contentHtml.length, 'chars');
+    console.log('[PDF] ✅ HTML ready:', contentHtml.length, 'chars');
 
-    // Launch Puppeteer
+    // ✅ FIX: Simplified browser launch for development
     console.log('[PDF] Launching browser...');
-browser = await puppeteer.launch({
-  args: isProduction 
-    ? [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
-    : ['--no-sandbox', '--disable-setuid-sandbox'],
-  defaultViewport: chromium.defaultViewport,
-  executablePath: isProduction 
-    ? await chromium.executablePath() 
-    : process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
-  headless: chromium.headless || 'new'
-});
-console.log('[PDF] ✅ Browser launched');
+    
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // ✅ FIXED: Better browser configuration
+    const launchOptions = {
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu'
+      ]
+    };
+    
+    // Only specify executablePath in production (Render)
+    if (isProduction) {
+      // For production (Render), use chromium from @sparticuz/chromium
+      const chromium = require('@sparticuz/chromium');
+      launchOptions.executablePath = await chromium.executablePath();
+      launchOptions.args = chromium.args;
+      launchOptions.defaultViewport = chromium.defaultViewport;
+      launchOptions.headless = chromium.headless;
+    }
+    // In development, puppeteer will find Chrome/Chromium automatically
+    
+    browser = await puppeteer.launch(launchOptions);
+    console.log('[PDF] ✅ Browser launched');
 
     const page = await browser.newPage();
     
-    // âœ… FIX 4: Enable console logging from the page
+    // Enable console logging from the page
     page.on('console', msg => console.log('[PDF Browser]', msg.text()));
     page.on('pageerror', error => console.error('[PDF Browser Error]', error));
     
@@ -432,7 +444,6 @@ console.log('[PDF] ✅ Browser launched');
     .content ul, .content ol { margin: 12px 0 12px 25px; }
     .content li { margin-bottom: 6px; }
     
-    /* âœ… FIX 5: Better image styling for embedded base64 */
     .content img {
       max-width: 90%;
       height: auto;
@@ -507,9 +518,9 @@ console.log('[PDF] ✅ Browser launched');
 
     console.log('[PDF] Setting content...');
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 90000 });
-    console.log('[PDF] âœ… Content set');
+    console.log('[PDF] ✅ Content set');
     
-    // âœ… FIX 6: Wait for base64 images to render
+    // Wait for base64 images to render
     await page.evaluate(() => {
       return Promise.all(
         Array.from(document.images)
@@ -537,7 +548,7 @@ console.log('[PDF] ✅ Browser launched');
       printBackground: true,
       margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' }
     });
-    console.log('[PDF] âœ… PDF created');
+    console.log('[PDF] ✅ PDF created');
 
     await browser.close();
     browser = null;
@@ -549,7 +560,7 @@ console.log('[PDF] ✅ Browser launched');
 
     const filename = `${doc.type.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.pdf`;
     
-    console.log('[PDF] âœ… SUCCESS - Size:', pdfBuffer.length, 'bytes');
+    console.log('[PDF] ✅ SUCCESS - Size:', pdfBuffer.length, 'bytes');
     console.log('[PDF] ====================================================');
     
     res.setHeader('Content-Type', 'application/pdf');
