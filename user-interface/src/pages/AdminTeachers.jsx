@@ -1,7 +1,7 @@
 import API from "@/api";
 import { React, useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -473,7 +473,7 @@ export default function AdminTeachers() {
                             </div>
                         </div>
                         
-                        <DialogFooter className="flex gap-2 sm:gap-0">
+                        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                             <Button 
                                 variant="outline" 
                                 onClick={() => {
@@ -486,19 +486,20 @@ export default function AdminTeachers() {
                             </Button>
                             <Button 
                                 onClick={handleAssign} 
-                                disabled={!formData.grade || !formData.stream || !formData.learningArea}
+                                disabled={!formData.grade || !formData.stream || !formData.learningArea || loading}
                                 className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                            {loading ? (
-                                <>
-                                <Loader2 />
-                                </>
-                            ): (
-                                <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Assign Class
-                                </>
-                            )}
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Assigning...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Assign Class
+                                    </>
+                                )}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -540,7 +541,7 @@ export default function AdminTeachers() {
                             </div>
                         </div>
                         
-                        <DialogFooter className="flex gap-2 sm:gap-0">
+                        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                             <Button 
                                 variant="outline" 
                                 onClick={() => { 
@@ -557,21 +558,20 @@ export default function AdminTeachers() {
                                         handleRemoveClass(JSON.parse(selectedClassToRemove));
                                     }
                                 }} 
-                                disabled={!selectedClassToRemove}
+                                disabled={!selectedClassToRemove || loading}
                                 className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-
-                                 {loading ? (
-                                <>
-                                <Loader2 />
-                                </>
-                            ): (
-                                <>
-                                <Minus className="h-4 w-4 mr-2" />
-                                Remove Class
-                                </>
-                            )
-                        }
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Removing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Minus className="h-4 w-4 mr-2" />
+                                        Remove Class
+                                    </>
+                                )}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

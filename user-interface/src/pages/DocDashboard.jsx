@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import API from "@/api";
+import { Loader2 } from "lucide-react";
 
 export default function DocDashboard() {
     const [documents, setDocuments] = useState([]);
@@ -290,8 +291,16 @@ export default function DocDashboard() {
                                                             onClick={() => handleDelete(doc._id)}
                                                             className="border-red-200 text-red-700 hover:bg-red-50 flex items-center gap-1"
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
-                                                            Delete
+                                                            {loading ? (
+                                                                <>
+                                                                <Loader2 />
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                <Trash2 className="h-4 w-4" />
+                                                                Delete
+                                                                </>
+                                                            )}
                                                         </Button>
                                                         <Button 
                                                             variant="outline" 
