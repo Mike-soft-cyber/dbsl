@@ -119,6 +119,7 @@ export default function AdminTeachers() {
     // Assign class
     const handleAssign = async () => {
         try {
+            setLoading(true)
             await API.post(`/teachers/${assigningTeacher._id}/class`, formData);
             const res = await API.get(`/teachers/school/${schoolCode}`);
             setTeachers(res.data);
@@ -128,12 +129,15 @@ export default function AdminTeachers() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to assign class");
+        }finally{
+            setLoading(false)
         }
     };
 
     // Remove class
     const handleRemoveClass = async (assignment) => {
         try {
+            setLoading(true)
             await API.delete(`/teachers/${removingTeacher._id}/class`, { data: assignment });
             const res = await API.get(`/teachers/school/${schoolCode}`);
             setTeachers(res.data);
@@ -143,6 +147,8 @@ export default function AdminTeachers() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to remove class");
+        }finally{
+            setLoading(false)
         }
     };
 
@@ -483,8 +489,16 @@ export default function AdminTeachers() {
                                 disabled={!formData.grade || !formData.stream || !formData.learningArea}
                                 className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
+                            {loading ? (
+                                <>
+                                <Loader2 />
+                                </>
+                            ): (
+                                <>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Assign Class
+                                </>
+                            )}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -546,8 +560,18 @@ export default function AdminTeachers() {
                                 disabled={!selectedClassToRemove}
                                 className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
+
+                                 {loading ? (
+                                <>
+                                <Loader2 />
+                                </>
+                            ): (
+                                <>
                                 <Minus className="h-4 w-4 mr-2" />
                                 Remove Class
+                                </>
+                            )
+                        }
                             </Button>
                         </DialogFooter>
                     </DialogContent>

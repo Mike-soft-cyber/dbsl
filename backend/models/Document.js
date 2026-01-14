@@ -55,21 +55,6 @@ const documentSchema = new mongoose.Schema({
 
   content: { type: String, required: true },
 
-  diagrams: [{
-  index: Number,
-  number: Number,
-  description: String,
-  caption: String,
-  fileName: String,
-  filePath: String,
-  imageData: String,
-  mimeType: { type: String, default: 'image/png' },
-  educationalPurpose: String,
-  source: String,  // ✅ NEW: Track diagram source
-  attribution: String,  // ✅ NEW: Attribution text
-  createdAt: { type: Date, default: Date.now }
-}],
-
   references: referencesSchema,
   resources: [String],
   keyInquiryQuestions: [String],
