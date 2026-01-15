@@ -2,6 +2,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { User, Clock, BookOpen, Shield, Download, BookText, Medal, MoveRight, Star, Award, Lightbulb, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import cbc from '@/photo/cbc.jpg'
 
 export default function Index() {
   const navigate = useNavigate();
@@ -41,29 +42,74 @@ export default function Index() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative py-20 px-6 text-center overflow-hidden">
+      <section className="relative py-12 md:py-20 px-4 md:px-6 overflow-hidden">
+        {/* Decorative elements */}
         <div className="absolute top-10 left-10 w-20 h-20 bg-blue-200/30 rounded-full blur-xl"></div>
         <div className="absolute bottom-10 right-10 w-24 h-24 bg-purple-200/30 rounded-full blur-xl"></div>
         
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-6">
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Digital Blueprint
-            </span>
-            <br />
-            <span className="text-gray-800">for Smart Learning</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Transform your teaching experience with AI-powered document creation. 
-            Generate CBC-aligned, professional resources in seconds, not hours.
-          </p>
-          <Button 
-            onClick={handleLoginClick} 
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 text-lg rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 inline-flex items-center gap-3"
-          >
-            Start Creating Now
-            <MoveRight className="w-5 h-5" />
-          </Button>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12">
+            {/* Text Content */}
+            <div className="flex-1 text-left lg:text-left">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6">
+                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Digital Blueprint
+                </span>
+                <br />
+                <span className="text-gray-800">for Smart Learning</span>
+              </h1>
+              <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl leading-relaxed">
+                Transform your teaching experience with AI-powered document creation. 
+                Generate CBC-aligned, professional resources in seconds, not hours.
+              </p>
+              <Button 
+                onClick={handleLoginClick} 
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 md:px-8 py-3 md:py-4 text-base md:text-lg rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 inline-flex items-center gap-3"
+              >
+                Start Creating Now
+                <MoveRight className="w-4 h-4 md:w-5 md:h-5" />
+              </Button>
+            </div>
+
+            {/* Image Container */}
+            <div className="flex-1 relative">
+              <div className="relative">
+                {/* Floating container for image */}
+                <div className="relative w-full max-w-lg mx-auto">
+                  {/* Image with decorative border */}
+                  <div className="relative rounded-2xl overflow-hidden shadow-2xl border-8 border-white">
+                    <img 
+                      src={cbc} 
+                      alt="Teachers and students engaged in learning"
+                      className="w-full h-auto object-cover"
+                    />
+                    
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-purple-600/10"></div>
+                  </div>
+                  
+                  {/* Decorative elements around image */}
+                  <div className="absolute -top-4 -left-4 w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl -z-10 blur-sm opacity-70"></div>
+                  <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl -z-10 blur-sm opacity-70"></div>
+                  
+                  {/* Stats overlay on image */}
+                  <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-4 md:p-5 border border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">90%</div>
+                        <div className="text-xs md:text-sm text-gray-600">Time Saved</div>
+                      </div>
+                      <div className="h-8 w-px bg-gray-300"></div>
+                      <div className="text-center">
+                        <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">5000+</div>
+                        <div className="text-xs md:text-sm text-gray-600">Educators</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -9,7 +9,8 @@ import {
   LogOut,
   School,
   Menu,
-  X
+  X,
+  MoreVertical
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +42,7 @@ export default function AdminPages() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [schoolLogo, setSchoolLogo] = useState(null);
   const [schoolName, setSchoolName] = useState("EduAdmin");
+  const [isMobile, setIsMobile] = useState(false);
 
   const menuItems = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/adminPages/adminDash" },
@@ -50,6 +52,18 @@ export default function AdminPages() {
     { label: "Payments", icon: CreditCard, path: "/adminPages/payment" },
     { label: "Settings", icon: Settings, path: "/adminPages/adminSettings" }
   ];
+
+  // Check mobile screen
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch school logo and details
   useEffect(() => {
@@ -117,6 +131,38 @@ export default function AdminPages() {
   return (
     <div className="flex flex-col min-h-screen w-full bg-gray-50 text-gray-900">
       <SidebarProvider>
+        {/* Mobile Header */}
+        {isMobile && (
+          <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50">
+            <div className="flex items-center justify-between p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  {schoolLogo ? (
+                    <img
+                      src={schoolLogo}
+                      alt="School Logo"
+                      className="h-6 w-6 object-contain rounded"
+                      onError={() => setSchoolLogo(null)}
+                    />
+                  ) : (
+                    <School className="h-6 w-6 text-teal-700" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="font-bold text-base text-gray-800 truncate">{schoolName}</h1>
+                  <p className="text-xs text-gray-500">Portal</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Desktop Sidebar */}
         <Sidebar className="hidden md:flex bg-white border-r border-gray-200 shadow-sm w-64">
           <SidebarContent>
@@ -174,50 +220,60 @@ export default function AdminPages() {
         </Sidebar>
 
         {/* Main Content Area */}
-        <div className="flex flex-col flex-1 w-full pb-16 md:pb-0 relative">
-          <Navbar userData={userData} />
-          <main className="flex-1 p-4 md:p-6 overflow-auto bg-gray-50">
+        <div className={`flex flex-col flex-1 w-full pb-16 md:pb-0 ${isMobile ? 'pt-16' : ''}`}>
+          {/* Show Navbar only on desktop */}
+          {!isMobile && <Navbar userData={userData} />}
+          
+          <main className="flex-1 p-3 md:p-6 overflow-auto bg-gray-50">
             <Outlet />
           </main>
 
           {/* Mobile Bottom Navigation */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
-            <div className="flex justify-around items-center py-2">
-              {menuItems.slice(0, 5).map(({ label, icon: Icon, path }) => (
+          {isMobile && (
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
+              <div className="flex justify-around items-center py-1">
+                {menuItems.slice(0, 4).map(({ label, icon: Icon, path }) => (
+                  <button
+                    key={label}
+                    onClick={() => handleNavigation(path)}
+                    className={`flex flex-col items-center p-1 rounded-lg transition-colors duration-150 min-w-0 flex-1 mx-0.5 ${
+                      isActive(path) 
+                        ? 'text-teal-600 bg-teal-50' 
+                        : 'text-gray-600 hover:text-teal-600'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 mb-0.5" />
+                    <span className="text-[10px] font-medium truncate max-w-full px-1">{label}</span>
+                  </button>
+                ))}
+                
+                {/* More menu button */}
                 <button
-                  key={label}
-                  onClick={() => handleNavigation(path)}
-                  className={`flex flex-col items-center p-2 rounded-lg transition-colors duration-150 min-w-0 flex-1 mx-1 ${
-                    isActive(path) 
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className={`flex flex-col items-center p-1 rounded-lg transition-colors duration-150 min-w-0 flex-1 mx-0.5 ${
+                    isSidebarOpen 
                       ? 'text-teal-600 bg-teal-50' 
                       : 'text-gray-600 hover:text-teal-600'
                   }`}
                 >
-                  <Icon className="h-5 w-5 mb-1" />
-                  <span className="text-xs font-medium truncate max-w-full">{label}</span>
+                  <MoreVertical className="h-4 w-4 mb-0.5" />
+                  <span className="text-[10px] font-medium">More</span>
                 </button>
-              ))}
-              
-              {/* More menu button for additional items */}
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className={`flex flex-col items-center p-2 rounded-lg transition-colors duration-150 min-w-0 flex-1 mx-1 ${
-                  isSidebarOpen 
-                    ? 'text-teal-600 bg-teal-50' 
-                    : 'text-gray-600 hover:text-teal-600'
-                }`}
-              >
-                <Menu className="h-5 w-5 mb-1" />
-                <span className="text-xs font-medium">More</span>
-              </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Mobile Popup Menu */}
-          {isSidebarOpen && (
-            <div className="md:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
+          {/* Mobile Sidebar Menu */}
+          {isMobile && isSidebarOpen && (
+            <div className="md:hidden fixed inset-0 z-50">
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-black/50"
+                onClick={() => setIsSidebarOpen(false)}
+              />
+              
               {/* Slide-up menu */}
-              <div className="relative bg-white rounded-t-2xl shadow-xl w-full max-w-md mx-4 mb-16 transform transition-transform duration-300 ease-out animate-in slide-in-from-bottom-full pointer-events-auto">
+              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl transform transition-transform duration-300 animate-in slide-in-from-bottom-full">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -233,7 +289,7 @@ export default function AdminPages() {
                           <School className="h-5 w-5 text-teal-700" />
                         )}
                       </div>
-                      <h3 className="font-semibold text-gray-800 text-lg truncate">{schoolName}</h3>
+                      <h3 className="font-semibold text-gray-800 text-base truncate">{schoolName}</h3>
                     </div>
                     <button 
                       onClick={() => setIsSidebarOpen(false)}
@@ -243,30 +299,32 @@ export default function AdminPages() {
                     </button>
                   </div>
 
-                  {/* Extra menu items */}
-                  {menuItems.slice(5).map(({ label, icon: Icon, path }) => (
+                  {/* Menu items */}
+                  <div className="space-y-1">
+                    {menuItems.slice(4).map(({ label, icon: Icon, path }) => (
+                      <button
+                        key={label}
+                        onClick={() => handleNavigation(path)}
+                        className={`flex items-center w-full p-3 rounded-lg transition-colors duration-150 ${
+                          isActive(path) 
+                            ? 'bg-teal-50 text-teal-700' 
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Icon className="mr-3 h-5 w-5" />
+                        <span className="font-medium">{label}</span>
+                      </button>
+                    ))}
+                    
+                    {/* Logout */}
                     <button
-                      key={label}
-                      onClick={() => handleNavigation(path)}
-                      className={`flex items-center w-full p-3 rounded-lg transition-colors duration-150 mb-2 ${
-                        isActive(path) 
-                          ? 'bg-teal-50 text-teal-700' 
-                          : 'text-gray-600 hover:bg-gray-50'
-                      }`}
+                      onClick={handleLogout}
+                      className="flex items-center w-full p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-150 mt-2 border-t border-gray-100 pt-3"
                     >
-                      <Icon className="mr-3 h-5 w-5" />
-                      <span className="font-medium">{label}</span>
+                      <LogOut className="mr-3 h-5 w-5" />
+                      <span className="font-medium">Logout</span>
                     </button>
-                  ))}
-
-                  {/* Logout */}
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center w-full p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-150 mt-4 border-t border-gray-100 pt-4"
-                  >
-                    <LogOut className="mr-3 h-5 w-5" />
-                    <span className="font-medium">Logout</span>
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
