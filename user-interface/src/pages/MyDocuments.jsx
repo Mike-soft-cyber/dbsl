@@ -275,7 +275,64 @@ export default function MyDocumentsPage() {
     );
   };
 
-  // ... (keep your existing getSubstrands and extractSubstrandsFromContent functions) ...
+ const getSubstrands = (doc) => {
+  // Priority 1: Direct substrand field
+  if (doc.substrand) {
+    return [doc.substrand];
+  }
+  
+  // Priority 2: Try to extract from CBC entry
+  if (doc.cbcEntry?.substrand) {
+    return [doc.cbcEntry.substrand];
+  }
+  
+  // Priority 3: Extract from content if it's a table-based document
+  if (doc.content && (doc.type === 'Lesson Concept Breakdown' || doc.type === 'Schemes of Work')) {
+    return extractSubstrandsFromContent(doc.content);
+  }
+  
+  // Priority 4: Use strand as fallback
+  if (doc.strand) {
+    return [doc.strand];
+  }
+  
+  return [];
+};
+
+const extractSubstrandsFromContent = (content) => {
+  if (!content) return [];
+  
+  const substrands = new Set();
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    if (line.includes('|') && !line.match(/^[\|\-\s:]+$/)) {
+      const cells = line.split('|').map(c => c.trim()).filter(c => c);
+      
+      // For Lesson Concept Breakdown: [Term, Week, Strand, Sub-strand, Learning Concept]
+      if (cells.length >= 5) {
+        const substrand = cells[3];
+        if (substrand && 
+            substrand.length > 2 && 
+            !substrand.toLowerCase().includes('sub-strand') &&
+            !substrand.toLowerCase().includes('strand')) {
+          substrands.add(substrand);
+        }
+      }
+      // For Schemes of Work: [Week, Lesson, Strand, Sub-strand, ...]
+      else if (cells.length >= 10) {
+        const substrand = cells[3];
+        if (substrand && 
+            substrand.length > 2 && 
+            !substrand.toLowerCase().includes('sub-strand')) {
+          substrands.add(substrand);
+        }
+      }
+    }
+  }
+  
+  return Array.from(substrands).slice(0, 5);
+};
 
   const renderSubstrands = (doc) => {
     const substrands = getSubstrands(doc);

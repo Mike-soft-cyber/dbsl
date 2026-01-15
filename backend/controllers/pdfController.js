@@ -179,31 +179,114 @@ function convertMarkdownTables(markdown) {
   const result = [];
   let inTable = false;
   let tableLines = [];
+  let headers = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
+    // Detect table start
     if (line.includes('|') && line.split('|').filter(c => c.trim()).length >= 2) {
       if (!inTable) {
         inTable = true;
         tableLines = [];
+        // First line with pipes is header
+        headers = line.split('|').map(c => c.trim()).filter(c => c);
+        tableLines.push(line);
+      } else {
+        tableLines.push(line);
       }
-      tableLines.push(line);
     } else {
-      if (inTable) {
+      // End of table
+      if (inTable && tableLines.length > 0) {
         result.push(buildHtmlTable(tableLines));
         tableLines = [];
         inTable = false;
+        headers = [];
       }
       result.push(line);
     }
   }
   
+  // Handle table at end of content
   if (inTable && tableLines.length > 0) {
     result.push(buildHtmlTable(tableLines));
   }
   
   return result.join('\n');
+}
+
+function buildHtmlTable(tableLines) {
+  if (tableLines.length < 2) return tableLines.join('\n');
+  
+  // Parse all rows first
+  const allRows = tableLines
+    .map(line => {
+      let clean = line.trim();
+      if (!clean.startsWith('|')) clean = '|' + clean;
+      if (!clean.endsWith('|')) clean = clean + '|';
+      
+      return clean
+        .split('|')
+        .map(cell => cell.trim())
+        .filter(cell => cell !== '');
+    })
+    .filter(row => row.length > 0);
+  
+  if (allRows.length === 0) return '';
+  
+  // Find separator row (contains only dashes, colons, spaces)
+  let separatorIndex = -1;
+  for (let i = 0; i < allRows.length; i++) {
+    if (allRows[i].every(cell => /^[-:\s]+$/.test(cell))) {
+      separatorIndex = i;
+      break;
+    }
+  }
+  
+  let html = '<table class="data-table">\n';
+  
+  // Build header (rows before separator, or first row if no separator)
+  const headerEndIndex = separatorIndex > 0 ? separatorIndex : 1;
+  if (headerEndIndex > 0) {
+    html += '  <thead>\n';
+    for (let i = 0; i < headerEndIndex; i++) {
+      html += '    <tr>\n';
+      allRows[i].forEach(cell => {
+        html += `      <th>${escapeHtml(cell)}</th>\n`;
+      });
+      html += '    </tr>\n';
+    }
+    html += '  </thead>\n';
+  }
+  
+  // Build body (rows after separator)
+  html += '  <tbody>\n';
+  const bodyStartIndex = separatorIndex > 0 ? separatorIndex + 1 : headerEndIndex;
+  
+  for (let i = bodyStartIndex; i < allRows.length; i++) {
+    const row = allRows[i];
+    
+    // Skip if it's another separator
+    if (row.every(cell => /^[-:\s]+$/.test(cell))) {
+      continue;
+    }
+    
+    // Skip if row has no meaningful content
+    if (row.every(cell => !cell || cell.length < 1)) {
+      continue;
+    }
+    
+    html += '    <tr>\n';
+    row.forEach(cell => {
+      html += `      <td>${escapeHtml(cell)}</td>\n`;
+    });
+    html += '    </tr>\n';
+  }
+  
+  html += '  </tbody>\n';
+  html += '</table>\n';
+  
+  return html;
 }
 
 /**
@@ -415,89 +498,152 @@ exports.generatePDF = async (req, res) => {
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 11pt;
-      line-height: 1.6;
+      font-size: ${isWide ? '9pt' : '11pt'};
+      line-height: 1.5;
       color: #000;
       background: #fff;
-      padding: ${isWide ? '15mm' : '20mm'};
+      padding: ${isWide ? '10mm' : '15mm'};
     }
+    
     .document-header {
       border-bottom: 3px solid #000;
-      padding-bottom: 15px;
-      margin-bottom: 25px;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      page-break-after: avoid;
     }
+    
     .document-header h1 {
-      font-size: 22pt;
+      font-size: ${isWide ? '18pt' : '20pt'};
       font-weight: bold;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
-    .metadata { font-size: 10pt; color: #333; }
-    .content h1 { font-size: 16pt; font-weight: bold; margin: 20px 0 12px; }
-    .content h2 { font-size: 14pt; font-weight: bold; margin: 16px 0 10px; }
-    .content h3 { font-size: 12pt; font-weight: bold; margin: 12px 0 8px; }
-    .content h4 { font-size: 11pt; font-weight: bold; margin: 10px 0 6px; }
-    .content p { margin-bottom: 10px; text-align: justify; }
-    .content ul, .content ol { margin: 12px 0 12px 25px; }
-    .content li { margin-bottom: 6px; }
+    
+    .metadata { 
+      font-size: ${isWide ? '8pt' : '9pt'}; 
+      color: #333; 
+    }
+    
+    .content h1 { font-size: 14pt; font-weight: bold; margin: 16px 0 10px; page-break-after: avoid; }
+    .content h2 { font-size: 12pt; font-weight: bold; margin: 14px 0 8px; page-break-after: avoid; }
+    .content h3 { font-size: 11pt; font-weight: bold; margin: 12px 0 6px; page-break-after: avoid; }
+    .content h4 { font-size: 10pt; font-weight: bold; margin: 10px 0 5px; page-break-after: avoid; }
+    
+    .content p { margin-bottom: 8px; text-align: justify; }
+    .content ul, .content ol { margin: 10px 0 10px 20px; }
+    .content li { margin-bottom: 4px; }
     
     .content img {
-      max-width: 90%;
+      max-width: 85%;
       height: auto;
-      max-height: 450px;
+      max-height: 400px;
       display: block;
-      margin: 20px auto;
+      margin: 15px auto;
       border: 1px solid #ddd;
-      padding: 8px;
+      padding: 6px;
       page-break-inside: avoid;
     }
     
     .image-container {
-      margin: 25px 0;
+      margin: 20px 0;
       text-align: center;
       page-break-inside: avoid;
     }
+    
     .diagram-image {
-      max-width: 90%;
+      max-width: 85%;
       height: auto;
-      max-height: 450px;
+      max-height: 400px;
       border: 1px solid #ddd;
-      padding: 8px;
+      padding: 6px;
     }
+    
     .image-caption {
-      font-size: 9pt;
+      font-size: 8pt;
       font-style: italic;
       color: #555;
-      margin-top: 10px;
+      margin-top: 8px;
     }
+    
+    /* ✅ CRITICAL: Enhanced table styles for PDF */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 20px 0;
-      font-size: ${isWide ? '8pt' : '10pt'};
+      margin: 15px 0;
+      font-size: ${isWide ? '7pt' : '9pt'};
       page-break-inside: auto;
     }
+    
     .data-table th {
       background-color: #2563eb;
       color: white;
-      border: 1px solid #000;
-      padding: ${isWide ? '4px' : '6px'};
+      border: 1px solid #1e40af;
+      padding: ${isWide ? '3px 4px' : '5px 6px'};
       text-align: center;
       font-weight: bold;
+      font-size: ${isWide ? '7pt' : '9pt'};
+      vertical-align: middle;
+      page-break-after: avoid;
+      page-break-inside: avoid;
     }
+    
     .data-table td {
-      border: 1px solid #000;
-      padding: ${isWide ? '4px' : '6px'};
+      border: 1px solid #333;
+      padding: ${isWide ? '3px 4px' : '5px 6px'};
       text-align: left;
+      vertical-align: top;
       word-wrap: break-word;
+      word-break: break-word;
+      hyphens: auto;
+      page-break-inside: avoid;
     }
-    .data-table tbody tr:nth-child(even) { background-color: #f5f5f5; }
+    
+    .data-table tbody tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    
+    .data-table tbody tr:nth-child(even) { 
+      background-color: #f5f5f5; 
+    }
+    
+    /* ✅ Prevent orphaned rows */
+    .data-table tbody tr:last-child {
+      page-break-after: avoid;
+    }
+    
     @page { 
-      margin: 15mm; 
+      margin: 12mm; 
       size: ${isWide ? 'A3 landscape' : 'A4 portrait'}; 
+    }
+    
+    @media print {
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      
+      .data-table {
+        page-break-inside: auto;
+      }
+      
+      .data-table thead {
+        display: table-header-group;
+      }
+      
+      .data-table tbody {
+        display: table-row-group;
+      }
+      
+      .data-table tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
     }
   </style>
 </head>

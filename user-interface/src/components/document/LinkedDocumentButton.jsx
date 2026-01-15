@@ -65,31 +65,27 @@ const LinkedDocumentButton = ({ document }) => {
     console.log('📦 Generation response:', response.data);
 
     if (response.data.success) {
-      const newDocumentId = response.data.document?._id || 
-                           response.data.documentId || 
-                           response.data._id;
+  const newDocumentId = response.data.document?._id || 
+                       response.data.documentId || 
+                       response.data._id;
 
-      if (newDocumentId) {
-        console.log('✅ Generation successful! Document ID:', newDocumentId);
-        
-        // Show success message
-        toast.success('Lesson Notes generated successfully! Redirecting...');
-        
-        // âœ… FIX: Navigate immediately, no timeout
-        window.location.href = `/documents/${newDocumentId}`;
-        
-      } else {
-        console.error('❌ No document ID in response:', response.data);
-        setError('Document generated but ID not found. Refreshing...');
-        
-        // Refresh to show in list
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      }
-    } else {
-      throw new Error(response.data.message || 'Generation failed');
-    }
+  if (newDocumentId) {
+    console.log('✅ Generation successful! Document ID:', newDocumentId);
+    
+    // Show success message
+    toast.success('Lesson Notes generated successfully!');
+    
+    // ✅ FIX: Navigate immediately without setTimeout
+    window.location.href = `/documents/${newDocumentId}`;
+    
+  } else {
+    console.error('❌ No document ID in response:', response.data);
+    setError('Document generated but ID not found');
+    toast.error('Document generated but cannot navigate. Please check My Documents.');
+  }
+} else {
+  throw new Error(response.data.message || 'Generation failed');
+}
   } catch (err) {
     console.error('❌ Generation failed:', err);
     const errorMessage = err.response?.data?.message || 

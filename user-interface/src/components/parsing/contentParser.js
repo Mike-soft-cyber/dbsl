@@ -60,20 +60,21 @@ class ContentParser {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // More lenient table header detection
-    if (!foundTableStart && (
-      line.includes('Term') && line.includes('Week') && line.includes('Learning Concept') &&
-      line.includes('|')
-    )) {
-      foundTableStart = true;
-      console.log('[Parser] Found table header at line', i);
-      continue;
+    // Detect table header - MORE LENIENT
+    if (!foundTableStart && line.includes('|')) {
+      const lowerLine = line.toLowerCase();
+      if ((lowerLine.includes('term') || lowerLine.includes('week')) && 
+          (lowerLine.includes('learning concept') || lowerLine.includes('strand'))) {
+        foundTableStart = true;
+        console.log('[Parser] Found table header at line', i);
+        continue;
+      }
     }
     
     if (!foundTableStart) continue;
     
     // Skip separator rows
-    if (line.match(/^[\|\-\s]+$/)) {
+    if (line.match(/^[\|\-\s:]+$/)) {
       continue;
     }
     
@@ -84,28 +85,50 @@ class ContentParser {
         .map(cell => cell.trim())
         .filter(cell => cell !== '');
       
-      console.log('[Parser] Row', rowNumber, '- Cells:', cells.length);
+      console.log('[Parser] Row', rowNumber, '- Raw cells:', cells.length, '-', cells.map(c => c.substring(0, 15)));
       
-      // Accept rows with exactly 5 columns (Term, Week, Strand, Sub-strand, Learning Concept)
-      if (cells.length === 5) {
-        // Validate that we have reasonable content
-        const [term, week, strand, substrand, concept] = cells;
+      // ✅ FIX: Accept 4 or 5 columns
+      if (cells.length >= 4 && cells.length <= 5) {
+        let term, week, strand, substrand, concept;
         
-        if (concept && concept.length > 10 && !concept.includes('please regenerate')) {
-          tableData.rows.push(cells);
-          console.log('[Parser] ✅ Added row', rowNumber);
-          rowNumber++;
+        if (cells.length === 5) {
+          // Standard format
+          [term, week, strand, substrand, concept] = cells;
+        } else if (cells.length === 4) {
+          // Missing term column
+          [week, strand, substrand, concept] = cells;
+          term = 'Term 1'; // Default
         }
+        
+        // Validate data
+        const isValidWeek = week && (week.toLowerCase().includes('week') || /week\s*\d+/i.test(week));
+        const isValidConcept = concept && concept.length > 10 && 
+                              !concept.toLowerCase().includes('learning concept') &&
+                              !concept.toLowerCase().includes('please regenerate') &&
+                              !concept.toLowerCase().includes('fallback');
+        
+        if (isValidWeek && isValidConcept) {
+          // Ensure we have 5 columns
+          const row = [term || 'Term 1', week, strand || '', substrand || '', concept];
+          tableData.rows.push(row);
+          console.log('[Parser] ✅ Added row', rowNumber, '- Week:', week);
+          rowNumber++;
+        } else {
+          console.log('[Parser] ⚠️ Invalid row - Week valid?', isValidWeek, '| Concept valid?', isValidConcept);
+        }
+      } else {
+        console.log('[Parser] ❌ Wrong column count:', cells.length, '(need 4-5)');
       }
     }
     
-    // Stop if we've found a reasonable number of rows
-    if (tableData.rows.length >= 60) {
+    // Safety limit
+    if (tableData.rows.length >= 100) {
+      console.log('[Parser] ⚠️ Reached 100 row limit, stopping');
       break;
     }
   }
   
-  console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows from Lesson Concept table');
+  console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows');
   return tableData.rows.length > 0 ? tableData : null;
 }
 
