@@ -1621,53 +1621,48 @@ exports.generateSchemeFromBreakdown = async (req, res) => {
     }
     
     console.log(`[${requestId}] Found breakdown: ${breakdown.grade} ${breakdown.subject} - ${breakdown.substrand}`);
-    console.log(`[${requestId}] Content length: ${breakdown.content?.length || 0} chars`);
     
-    // 2. Extract learning concepts from the breakdown table
+    // 2. Extract learning concepts
     const learningConcepts = extractConceptsFromBreakdown(breakdown.content);
     
     console.log(`[${requestId}] Extracted ${learningConcepts.length} concepts`);
     
     if (learningConcepts.length === 0) {
-      // Try one more fallback: look for any structured content
-      console.log(`[${requestId}] No concepts found, checking for any structured content...`);
-      
-      // Try to extract any numbered or bulleted items
-      const lines = breakdown.content?.split('\n') || [];
-      let fallbackCount = 0;
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line && line.length > 10 && (line.includes('. ') || line.includes(') '))) {
-          const parts = line.split(/[\.\)]\s+/);
-          if (parts.length >= 2 && parts[1].length > 10) {
-            learningConcepts.push({
-              term: 'Term 1',
-              week: `Week ${fallbackCount + 1}`,
-              weekNum: fallbackCount + 1,
-              strand: breakdown.strand || 'General',
-              substrand: breakdown.substrand || 'General',
-              concept: parts[1].trim()
-            });
-            fallbackCount++;
-          }
-        }
-      }
-      
-      if (learningConcepts.length === 0) {
-        return res.status(400).json({ 
-          success: false,
-          error: 'No learning concepts found in breakdown',
-          message: 'Please ensure your Lesson Concept Breakdown contains a table with learning concepts. Each row should have at least a week number and concept description.'
-        });
-      }
+      return res.status(400).json({ 
+        success: false,
+        error: 'No learning concepts found in breakdown'
+      });
     }
     
-    console.log(`[${requestId}] Using ${learningConcepts.length} concepts for scheme generation`);
+    // 3. Get curriculum configuration
+    const LevelConfig = require('../models/LevelConfig');
+    const SubjectConfig = require('../models/SubjectConfig');
     
-    // 3. Generate Scheme of Work using these concepts
+    const levelConfig = await LevelConfig.findOne({ 
+      grades: breakdown.grade 
+    });
+    
+    const subjectConfig = await SubjectConfig.findOne({
+      subject: { $regex: new RegExp(breakdown.subject, 'i') },
+      grades: breakdown.grade
+    });
+    
+    const lessonDuration = levelConfig?.lessonDuration || 40;
+    const lessonsPerWeek = subjectConfig?.lessonsPerWeek || 5;
+    
+    // ✅ CRITICAL FIX: Ensure teacher is properly set
+    const teacherId = req.user?._id || breakdown.teacher;
+    
+    if (!teacherId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Teacher ID not found. Please log in again.'
+      });
+    }
+    
+    // ✅ Build proper request data with teacher field
     const requestData = {
-      teacher: req.user?._id,
+      teacher: teacherId, // ✅ CRITICAL: This was missing/undefined
       teacherName: teacherName || req.user?.firstName + ' ' + (req.user?.lastName || '') || 'Teacher',
       school: school || breakdown.school || 'Educational Institution',
       grade: breakdown.grade,
@@ -1675,32 +1670,65 @@ exports.generateSchemeFromBreakdown = async (req, res) => {
       strand: breakdown.strand,
       substrand: breakdown.substrand,
       term: breakdown.term,
-      weeks: Math.ceil(learningConcepts.length / 5), // Calculate weeks from concepts
-      lessonsPerWeek: 5,
+      weeks: Math.ceil(learningConcepts.length / lessonsPerWeek),
+      lessonsPerWeek: lessonsPerWeek,
+      lessonDuration: lessonDuration,
       learningConcepts: learningConcepts,
       sourceBreakdownId: breakdownId,
       totalConcepts: learningConcepts.length
     };
 
     console.log(`[${requestId}] Request data prepared:`, {
+      teacher: requestData.teacher?.toString(),
       grade: requestData.grade,
       subject: requestData.learningArea,
       concepts: learningConcepts.length,
       weeks: requestData.weeks
     });
 
-    // 4. Generate the scheme document
+    // 4. Generate scheme document - USE DIRECT DOCUMENT CREATION
     let schemeDoc;
     try {
-      schemeDoc = await DocumentGeneratorFactory.generate(
-        'Schemes of Work',
-        requestData,
-        breakdown.cbcEntry
-      );
+      // ✅ FIX: Use direct creation instead of factory method
+      const SchemesGenerator = require('../services/documentGenerators/SchemesGenerator');
+      const generator = new SchemesGenerator();
       
-      if (!schemeDoc || !schemeDoc._id) {
-        throw new Error('Document generation returned null or missing ID');
-      }
+      const aiContent = await generator.generate(requestData, breakdown.cbcEntry);
+      
+      // Process content
+      const { postProcessGeneratedContent } = require('../utils/contentProcessor');
+      const processedContent = postProcessGeneratedContent(aiContent, 'Schemes of Work');
+      
+      // Create document directly
+      schemeDoc = await Document.create({
+        teacher: teacherId, // ✅ Explicitly set teacher
+        type: 'Schemes of Work',
+        term: breakdown.term,
+        grade: breakdown.grade,
+        school: requestData.school,
+        subject: breakdown.subject,
+        strand: breakdown.strand,
+        substrand: breakdown.substrand,
+        cbcEntry: breakdown.cbcEntry._id,
+        content: processedContent,
+        diagrams: [],
+        references: {
+          slo: breakdown.cbcEntry?.slo?.slice(0, 3).join('; ') || '',
+          experiences: breakdown.cbcEntry?.learningExperiences?.slice(0, 2).join('; ') || '',
+        },
+        resources: breakdown.cbcEntry?.resources || [],
+        keyInquiryQuestions: breakdown.cbcEntry?.keyInquiryQuestions || [],
+        status: "completed",
+        metadata: {
+          generationTime: Date.now() - startTime,
+          sourceDocument: breakdownId,
+          sourceType: 'Lesson Concept Breakdown',
+          conceptsUsed: learningConcepts.length,
+          generatedFrom: 'breakdown'
+        },
+        version: 1,
+        generatedBy: 'Concept-based generation'
+      });
       
       console.log(`[${requestId}] ✅ Generated scheme: ${schemeDoc._id}`);
       
@@ -1713,37 +1741,11 @@ exports.generateSchemeFromBreakdown = async (req, res) => {
       });
     }
 
-    // 5. Link the documents
-    try {
-      await Document.findByIdAndUpdate(breakdownId, {
-        $push: {
-          'metadata.derivedDocuments': {
-            documentId: schemeDoc._id,
-            type: 'Schemes of Work',
-            createdAt: new Date()
-          }
-        }
-      });
-      
-      await Document.findByIdAndUpdate(schemeDoc._id, {
-        $set: {
-          parentDocument: breakdownId,
-          'metadata.sourceDocument': breakdownId,
-          'metadata.sourceType': 'Lesson Concept Breakdown'
-        }
-      });
-      
-      console.log(`[${requestId}] ✅ Documents linked successfully`);
-    } catch (linkError) {
-      console.error(`[${requestId}] ⚠️ Document linking failed:`, linkError);
-      // Continue even if linking fails
-    }
-
-    // 6. Track activity
+    // 5. Track activity
     try {
       const activityData = {
         teacherName: requestData.teacherName,
-        teacherId: req.user?._id,
+        teacherId: teacherId,
         grade: breakdown.grade,
         stream: 'General',
         learningArea: breakdown.subject,
@@ -1758,10 +1760,10 @@ exports.generateSchemeFromBreakdown = async (req, res) => {
       console.error(`[${requestId}] ⚠️ Activity logging failed:`, activityError);
     }
 
-    // 7. Update user stats
-    if (req.user?._id) {
+    // 6. Update user stats
+    if (teacherId) {
       await User.findByIdAndUpdate(
-        req.user._id,
+        teacherId,
         { $inc: { documentsCreated: 1 } }
       );
     }
@@ -1769,7 +1771,7 @@ exports.generateSchemeFromBreakdown = async (req, res) => {
     const totalTime = Date.now() - startTime;
     console.log(`[${requestId}] ✅ Complete in ${totalTime}ms`);
 
-    // 8. Return success response
+    // 7. Return success response
     res.status(201).json({
       success: true,
       document: {

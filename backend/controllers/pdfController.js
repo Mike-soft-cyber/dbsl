@@ -400,8 +400,8 @@ exports.generatePDF = async (req, res) => {
       return res.status(400).json({ error: 'Invalid document ID' });
     }
 
-    // Fetch document with diagrams
-    console.log('[PDF] Fetching document with diagrams...');
+    // Fetch document
+    console.log('[PDF] Fetching document...');
     const doc = await Document.findById(id);
     
     if (!doc) {
@@ -411,16 +411,15 @@ exports.generatePDF = async (req, res) => {
 
     console.log('[PDF] ✅ Document found:', doc.type);
     console.log('[PDF] Content length:', doc.content?.length || 0);
-    console.log('[PDF] Diagrams:', doc.diagrams?.length || 0);
 
     // Get base URL
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     console.log('[PDF] Base URL:', baseUrl);
     
-    // Process content to use stored base64 from diagrams array
+    // Process content
     let contentForPdf = doc.content || '';
     
-    // Replace diagram file paths with base64 from stored diagrams
+    // Replace diagram file paths with base64 if available
     if (doc.diagrams && doc.diagrams.length > 0) {
       console.log('[PDF] Processing', doc.diagrams.length, 'stored diagrams');
       
@@ -429,37 +428,26 @@ exports.generatePDF = async (req, res) => {
           const filenamePattern = diagram.fileName || `diagram-${index + 1}.png`;
           const pathPattern = `/api/diagrams/${filenamePattern}`;
           
-          console.log('[PDF] Replacing', pathPattern, 'with base64 data');
-          
           contentForPdf = contentForPdf.replace(
             new RegExp(`!\\[(.*?)\\]\\(${pathPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g'),
             `![$1](${diagram.imageData})`
           );
         }
       });
-      
-      console.log('[PDF] ✅ Diagram replacement complete');
     }
 
-    // Try to convert any remaining non-base64 images
-    try {
-      contentForPdf = await convertImagesToBase64(contentForPdf, baseUrl);
-      console.log('[PDF] ✅ Additional image conversion complete');
-    } catch (imageError) {
-      console.warn('[PDF] ⚠️ Some image conversions failed:', imageError.message);
-    }
-    
-    // Convert to HTML
+    // Convert to HTML with FIXED table conversion
     console.log('[PDF] Converting to HTML...');
-    const contentHtml = markdownToHtml(contentForPdf, baseUrl, doc.type);
+    const contentHtml = markdownToHtmlWithTables(contentForPdf, baseUrl, doc.type);
     console.log('[PDF] ✅ HTML ready:', contentHtml.length, 'chars');
 
-    // ✅ FIX: Simplified browser launch for development
-    console.log('[PDF] Launching browser...');
+    // Determine page size
+    const isWide = doc.type === 'Lesson Concept Breakdown' || doc.type === 'Schemes of Work';
     
+    // Launch browser
+    console.log('[PDF] Launching browser...');
     const isProduction = process.env.NODE_ENV === 'production';
     
-    // ✅ FIXED: Better browser configuration
     const launchOptions = {
       headless: 'new',
       args: [
@@ -471,16 +459,13 @@ exports.generatePDF = async (req, res) => {
       ]
     };
     
-    // Only specify executablePath in production (Render)
     if (isProduction) {
-      // For production (Render), use chromium from @sparticuz/chromium
       const chromium = require('@sparticuz/chromium');
       launchOptions.executablePath = await chromium.executablePath();
       launchOptions.args = chromium.args;
       launchOptions.defaultViewport = chromium.defaultViewport;
       launchOptions.headless = chromium.headless;
     }
-    // In development, puppeteer will find Chrome/Chromium automatically
     
     browser = await puppeteer.launch(launchOptions);
     console.log('[PDF] ✅ Browser launched');
@@ -491,182 +476,14 @@ exports.generatePDF = async (req, res) => {
     page.on('console', msg => console.log('[PDF Browser]', msg.text()));
     page.on('pageerror', error => console.error('[PDF Browser Error]', error));
     
-    const isWide = doc.type === 'Lesson Concept Breakdown' || doc.type === 'Schemes of Work';
-    
-    // Build HTML with embedded base64 images
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: ${isWide ? '9pt' : '11pt'};
-      line-height: 1.5;
-      color: #000;
-      background: #fff;
-      padding: ${isWide ? '10mm' : '15mm'};
-    }
-    
-    .document-header {
-      border-bottom: 3px solid #000;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
-      page-break-after: avoid;
-    }
-    
-    .document-header h1 {
-      font-size: ${isWide ? '18pt' : '20pt'};
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-    
-    .metadata { 
-      font-size: ${isWide ? '8pt' : '9pt'}; 
-      color: #333; 
-    }
-    
-    .content h1 { font-size: 14pt; font-weight: bold; margin: 16px 0 10px; page-break-after: avoid; }
-    .content h2 { font-size: 12pt; font-weight: bold; margin: 14px 0 8px; page-break-after: avoid; }
-    .content h3 { font-size: 11pt; font-weight: bold; margin: 12px 0 6px; page-break-after: avoid; }
-    .content h4 { font-size: 10pt; font-weight: bold; margin: 10px 0 5px; page-break-after: avoid; }
-    
-    .content p { margin-bottom: 8px; text-align: justify; }
-    .content ul, .content ol { margin: 10px 0 10px 20px; }
-    .content li { margin-bottom: 4px; }
-    
-    .content img {
-      max-width: 85%;
-      height: auto;
-      max-height: 400px;
-      display: block;
-      margin: 15px auto;
-      border: 1px solid #ddd;
-      padding: 6px;
-      page-break-inside: avoid;
-    }
-    
-    .image-container {
-      margin: 20px 0;
-      text-align: center;
-      page-break-inside: avoid;
-    }
-    
-    .diagram-image {
-      max-width: 85%;
-      height: auto;
-      max-height: 400px;
-      border: 1px solid #ddd;
-      padding: 6px;
-    }
-    
-    .image-caption {
-      font-size: 8pt;
-      font-style: italic;
-      color: #555;
-      margin-top: 8px;
-    }
-    
-    /* ✅ CRITICAL: Enhanced table styles for PDF */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 15px 0;
-      font-size: ${isWide ? '7pt' : '9pt'};
-      page-break-inside: auto;
-    }
-    
-    .data-table th {
-      background-color: #2563eb;
-      color: white;
-      border: 1px solid #1e40af;
-      padding: ${isWide ? '3px 4px' : '5px 6px'};
-      text-align: center;
-      font-weight: bold;
-      font-size: ${isWide ? '7pt' : '9pt'};
-      vertical-align: middle;
-      page-break-after: avoid;
-      page-break-inside: avoid;
-    }
-    
-    .data-table td {
-      border: 1px solid #333;
-      padding: ${isWide ? '3px 4px' : '5px 6px'};
-      text-align: left;
-      vertical-align: top;
-      word-wrap: break-word;
-      word-break: break-word;
-      hyphens: auto;
-      page-break-inside: avoid;
-    }
-    
-    .data-table tbody tr {
-      page-break-inside: avoid;
-      page-break-after: auto;
-    }
-    
-    .data-table tbody tr:nth-child(even) { 
-      background-color: #f5f5f5; 
-    }
-    
-    /* ✅ Prevent orphaned rows */
-    .data-table tbody tr:last-child {
-      page-break-after: avoid;
-    }
-    
-    @page { 
-      margin: 12mm; 
-      size: ${isWide ? 'A3 landscape' : 'A4 portrait'}; 
-    }
-    
-    @media print {
-      body {
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-      }
-      
-      .data-table {
-        page-break-inside: auto;
-      }
-      
-      .data-table thead {
-        display: table-header-group;
-      }
-      
-      .data-table tbody {
-        display: table-row-group;
-      }
-      
-      .data-table tr {
-        page-break-inside: avoid;
-        page-break-after: auto;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="document-header">
-    <h1>${doc.type || 'Document'}</h1>
-    <div class="metadata">
-      <strong>Grade:</strong> ${doc.grade || 'N/A'} | 
-      <strong>Subject:</strong> ${doc.subject || 'N/A'} | 
-      <strong>Term:</strong> ${doc.term || 'N/A'}
-      ${doc.strand ? `<br><strong>Strand:</strong> ${doc.strand}` : ''}
-      ${doc.substrand ? ` | <strong>Sub-strand:</strong> ${doc.substrand}` : ''}
-    </div>
-  </div>
-  <div class="content">${contentHtml}</div>
-</body>
-</html>`;
+    // Build HTML
+    const html = buildPDFHTML(doc, contentHtml, isWide);
 
     console.log('[PDF] Setting content...');
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 90000 });
     console.log('[PDF] ✅ Content set');
     
-    // Wait for base64 images to render
+    // Wait for images
     await page.evaluate(() => {
       return Promise.all(
         Array.from(document.images)
@@ -692,7 +509,7 @@ exports.generatePDF = async (req, res) => {
       format: isWide ? 'A3' : 'A4',
       landscape: isWide,
       printBackground: true,
-      margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' }
+      margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '12mm' }
     });
     console.log('[PDF] ✅ PDF created');
 
@@ -736,3 +553,273 @@ exports.generatePDF = async (req, res) => {
     }
   }
 };
+
+// ✅ NEW: Improved markdown to HTML with proper table handling
+function markdownToHtmlWithTables(markdown, baseUrl, documentType) {
+  if (!markdown) return '<p>No content available</p>';
+  
+  let html = markdown;
+  
+  // Handle base64 images first
+  html = html.replace(/!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, (match, alt, base64Data) => {
+    return `
+  <div class="image-container">
+    <img src="${base64Data}" alt="${alt}" class="diagram-image" />
+    <p class="image-caption">${alt}</p>
+  </div>`;
+  });
+  
+  // ✅ CRITICAL: Convert markdown tables BEFORE other conversions
+  html = convertMarkdownTablesToHTML(html);
+  
+  // Remove diagram placeholders
+  html = html.replace(/\[DIAGRAM:[^\]]+\]/g, '');
+  html = html.replace(/\*\[Diagram unavailable\]\*/g, '');
+  
+  // Convert headings
+  html = html.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+  
+  // Convert bold and italic
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+  
+  // Convert lists
+  html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>\n?)+/g, match => {
+    if (!match.includes('<ol>') && !match.includes('<table>')) {
+      return '<ul>' + match + '</ul>';
+    }
+    return match;
+  });
+  
+  // Convert paragraphs
+  html = html.split('\n\n').map(block => {
+    block = block.trim();
+    if (!block) return '';
+    if (block.startsWith('<')) return block;
+    if (block.includes('<table>')) return block;
+    return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+  }).join('\n');
+  
+  return html;
+}
+
+// ✅ NEW: Dedicated table conversion function
+function convertMarkdownTablesToHTML(content) {
+  const lines = content.split('\n');
+  const result = [];
+  let currentTable = [];
+  let inTable = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Detect table line (has pipes and isn't just separator)
+    if (line.includes('|') && !line.match(/^[\|\-\s:]+$/)) {
+      if (!inTable) {
+        inTable = true;
+        currentTable = [];
+      }
+      currentTable.push(line);
+    } else {
+      // End of table
+      if (inTable && currentTable.length > 0) {
+        result.push(buildHTMLTableFromLines(currentTable));
+        currentTable = [];
+        inTable = false;
+      }
+      result.push(line);
+    }
+  }
+  
+  // Handle table at end
+  if (inTable && currentTable.length > 0) {
+    result.push(buildHTMLTableFromLines(currentTable));
+  }
+  
+  return result.join('\n');
+}
+
+// ✅ NEW: Build HTML table from markdown lines
+function buildHTMLTableFromLines(tableLines) {
+  if (tableLines.length === 0) return '';
+  
+  // Parse all rows
+  const rows = tableLines.map(line => {
+    let clean = line.trim();
+    if (!clean.startsWith('|')) clean = '|' + clean;
+    if (!clean.endsWith('|')) clean = clean + '|';
+    
+    return clean
+      .split('|')
+      .map(cell => cell.trim())
+      .filter(cell => cell !== '');
+  });
+  
+  if (rows.length === 0) return '';
+  
+  // Find separator (contains only dashes/colons)
+  let separatorIdx = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].every(cell => /^[-:\s]+$/.test(cell))) {
+      separatorIdx = i;
+      break;
+    }
+  }
+  
+  let html = '<table class="data-table">\n';
+  
+  // Headers (before separator)
+  const headerEnd = separatorIdx > 0 ? separatorIdx : 1;
+  if (headerEnd > 0) {
+    html += '  <thead>\n';
+    for (let i = 0; i < headerEnd; i++) {
+      html += '    <tr>\n';
+      rows[i].forEach(cell => {
+        html += `      <th>${escapeHtml(cell)}</th>\n`;
+      });
+      html += '    </tr>\n';
+    }
+    html += '  </thead>\n';
+  }
+  
+  // Body (after separator)
+  html += '  <tbody>\n';
+  const bodyStart = separatorIdx > 0 ? separatorIdx + 1 : headerEnd;
+  
+  for (let i = bodyStart; i < rows.length; i++) {
+    const row = rows[i];
+    
+    // Skip empty or separator rows
+    if (row.every(cell => /^[-:\s]*$/.test(cell))) continue;
+    if (row.every(cell => !cell || cell.length < 1)) continue;
+    
+    html += '    <tr>\n';
+    row.forEach(cell => {
+      html += `      <td>${escapeHtml(cell)}</td>\n`;
+    });
+    html += '    </tr>\n';
+  }
+  
+  html += '  </tbody>\n';
+  html += '</table>\n';
+  
+  return html;
+}
+
+// ✅ NEW: Build complete PDF HTML
+function buildPDFHTML(doc, contentHtml, isWide) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: ${isWide ? '8pt' : '10pt'};
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+      padding: ${isWide ? '10mm' : '15mm'};
+    }
+    .document-header {
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+      page-break-after: avoid;
+    }
+    .document-header h1 {
+      font-size: ${isWide ? '16pt' : '18pt'};
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .metadata { 
+      font-size: ${isWide ? '7pt' : '8pt'}; 
+      color: #333; 
+    }
+    .content h1 { font-size: 14pt; margin: 15px 0 8px; page-break-after: avoid; }
+    .content h2 { font-size: 12pt; margin: 12px 0 6px; page-break-after: avoid; }
+    .content h3 { font-size: 11pt; margin: 10px 0 5px; page-break-after: avoid; }
+    .content h4 { font-size: 10pt; margin: 8px 0 4px; page-break-after: avoid; }
+    .content p { margin-bottom: 6px; }
+    .content ul, .content ol { margin: 8px 0 8px 15px; }
+    .content li { margin-bottom: 3px; }
+    
+    /* ✅ CRITICAL: Table styles for PDF */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: ${isWide ? '6.5pt' : '8pt'};
+      page-break-inside: auto;
+    }
+    .data-table th {
+      background-color: #2563eb !important;
+      color: white !important;
+      border: 1px solid #1e40af;
+      padding: ${isWide ? '3px' : '4px'};
+      text-align: center;
+      font-weight: bold;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .data-table td {
+      border: 1px solid #333;
+      padding: ${isWide ? '3px' : '4px'};
+      vertical-align: top;
+      word-wrap: break-word;
+      page-break-inside: avoid;
+    }
+    .data-table tbody tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    .data-table tbody tr:nth-child(even) { 
+      background-color: #f5f5f5 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    
+    @page { 
+      margin: 10mm; 
+      size: ${isWide ? 'A3 landscape' : 'A4 portrait'}; 
+    }
+    
+    @media print {
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .data-table thead {
+        display: table-header-group;
+      }
+      .data-table tbody {
+        display: table-row-group;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="document-header">
+    <h1>${doc.type || 'Document'}</h1>
+    <div class="metadata">
+      <strong>Grade:</strong> ${doc.grade || 'N/A'} | 
+      <strong>Subject:</strong> ${doc.subject || 'N/A'} | 
+      <strong>Term:</strong> ${doc.term || 'N/A'}
+      ${doc.strand ? `<br><strong>Strand:</strong> ${doc.strand}` : ''}
+      ${doc.substrand ? ` | <strong>Sub-strand:</strong> ${doc.substrand}` : ''}
+    </div>
+  </div>
+  <div class="content">${contentHtml}</div>
+</body>
+</html>`;
+}
