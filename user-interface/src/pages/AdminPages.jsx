@@ -26,7 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from "@/components/ui/sidebar";
-import Navbar from "@/components/ui/dashboard/Navbar"; // Your Navbar component
+import Navbar from "@/components/ui/dashboard/NavBar";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import axios from "axios";
 
