@@ -1,27 +1,87 @@
 // Enhanced content post-processing function
-const postProcessGeneratedContent = (content, documentType) => {
-  let processed = content;
-
-  // Fix table concatenation issues
-  if (documentType === "Lesson Concept Breakdown" || documentType === "Schemes of Work") {
-    // Fix concatenated table rows
-    const concatenatedRowPattern = /(\|\s*[^|\n]*\|\s*[^|\n]*\|\s*[^|\n]*\|\s*[^|\n]*\|\s*[^|\n]*\s*\|)(\s*\|\s*[^|\n]*)/g;
-    processed = processed.replace(concatenatedRowPattern, '$1\n$2');
-    
-    // Ensure proper row separation
-    processed = processed.replace(/(\|[^|\n]*\|)([^|\n]*\|[^|\n]*\|)/g, '$1\n|$2');
-  }
-
-  // Clean up AI explanations
-  processed = processed.replace(/^(Here's|I've created|This is|Below is).*$/gm, '');
-  processed = processed.replace(/^Note:.*$/gm, '');
+function postProcessGeneratedContent(content, documentType) {
+  if (!content) return '';
   
-  // Ensure proper spacing
-  processed = processed.replace(/\n{4,}/g, '\n\n\n');
+  console.log(`[ContentProcessor] Processing ${documentType}`);
+  console.log(`[ContentProcessor] Input length: ${content.length} chars`);
+  
+  let processed = content;
+  
+  // ✅ FIX: Clean up any multi-line table cells
+  if (documentType === 'Lesson Concept Breakdown' || documentType === 'Schemes of Work') {
+    processed = cleanupTableCells(processed);
+  }
+  
+  // Remove any AI artifacts
+  processed = processed.replace(/```markdown\n?/g, '');
+  processed = processed.replace(/```\n?/g, '');
   processed = processed.trim();
   
+  console.log(`[ContentProcessor] Output length: ${processed.length} chars`);
+  
   return processed;
-};
+}
+
+function cleanupTableCells(content) {
+  const lines = content.split('\n');
+  const cleanedLines = [];
+  let inTable = false;
+  let currentRow = '';
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Detect table start
+    if (line.includes('|') && (line.includes('Term') || line.includes('WEEK'))) {
+      inTable = true;
+      cleanedLines.push(line);
+      continue;
+    }
+    
+    // Skip separator lines
+    if (line.match(/^\|[\s\-:]+\|$/)) {
+      cleanedLines.push(line);
+      continue;
+    }
+    
+    // Process table rows
+    if (inTable && line.includes('|')) {
+      const pipeCount = (line.match(/\|/g) || []).length;
+      
+      // If row has proper number of pipes, it's complete
+      if (pipeCount >= 5) { // Adjust based on expected columns
+        if (currentRow) {
+          cleanedLines.push(currentRow);
+          currentRow = '';
+        }
+        cleanedLines.push(line);
+      } else {
+        // Row is incomplete, accumulate it
+        currentRow += (currentRow ? ' ' : '') + line;
+      }
+    } else if (inTable && !line.includes('|') && line.length > 0) {
+      // Text without pipes inside table - append to current row
+      currentRow += ' ' + line;
+    } else {
+      // Not in table
+      if (currentRow) {
+        cleanedLines.push(currentRow);
+        currentRow = '';
+      }
+      cleanedLines.push(line);
+      if (!line.includes('|')) {
+        inTable = false;
+      }
+    }
+  }
+  
+  // Add any remaining row
+  if (currentRow) {
+    cleanedLines.push(currentRow);
+  }
+  
+  return cleanedLines.join('\n');
+}
 
 const parseClientLessonConceptBreakdown = (content) => {
   const tableData = {
@@ -193,5 +253,6 @@ module.exports = {
   parseClientSchemesOfWork,
   expandSLOs,
   preprocessContent,
-  detectDocumentStructure
+  detectDocumentStructure,
+  cleanupTableCells
 };
