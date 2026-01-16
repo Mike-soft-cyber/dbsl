@@ -5,96 +5,7 @@ const path = require('path');
 const Document = require('../models/Document');
 const axios = require('axios');
 
-/**
- * Convert diagram URLs to base64 for embedding in PDF
- */
-async function convertImagesToBase64(content, baseUrl) {
-  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-  let match;
-  const replacements = [];
-  
-  console.log('[PDF] Scanning content for images...');
-  
-  while ((match = imageRegex.exec(content)) !== null) {
-    const [fullMatch, alt, imagePath] = match;
-    
-    console.log(`[PDF] Found image: ${imagePath.substring(0, 50)}...`);
-    
-    // Skip if already base64
-    if (imagePath.startsWith('data:image')) {
-      console.log(`[PDF] Skipping base64 image`);
-      continue;
-    }
-    
-    // Build full URL
-    let imageUrl = imagePath;
-    if (!imagePath.startsWith('http')) {
-      // Handle relative paths
-      if (imagePath.startsWith('/api/diagrams/')) {
-        imageUrl = `${baseUrl}${imagePath}`;
-      } else if (imagePath.startsWith('/')) {
-        imageUrl = `${baseUrl}${imagePath}`;
-      } else {
-        // Just a filename
-        imageUrl = `${baseUrl}/api/diagrams/${imagePath}`;
-      }
-    }
-    
-    replacements.push({ fullMatch, alt, imageUrl, imagePath });
-  }
-  
-  console.log(`[PDF] Found ${replacements.length} images to convert`);
-  
-  for (const { fullMatch, alt, imageUrl } of replacements) {
-    try {
-      console.log(`[PDF] Converting: ${imageUrl}`);
-      
-      const response = await axios.get(imageUrl, { 
-        responseType: 'arraybuffer',
-        timeout: 15000,
-        validateStatus: (status) => status < 500,
-        headers: {
-          'User-Agent': 'PDF-Generator/1.0'
-        }
-      });
-      
-      if (response.status === 404) {
-        console.warn(`[PDF] ⚠️ Image not found: ${imageUrl}`);
-        content = content.replace(fullMatch, `*[Image: ${alt}]*`);
-        continue;
-      }
-      
-      if (!response.data || response.data.length === 0) {
-        console.warn(`[PDF] ⚠️ Empty response for: ${imageUrl}`);
-        content = content.replace(fullMatch, `*[Image: ${alt}]*`);
-        continue;
-      }
-      
-      const base64 = Buffer.from(response.data).toString('base64');
-      let mimeType = response.headers['content-type'] || 'image/png';
-      
-      // Ensure valid mime type
-      if (!mimeType.startsWith('image/')) {
-        mimeType = 'image/png';
-      }
-      
-      const base64Image = `data:${mimeType};base64,${base64}`;
-      content = content.replace(fullMatch, `![${alt}](${base64Image})`);
-      
-      console.log(`[PDF] ✅ Converted: ${imageUrl} (${base64.length} bytes)`);
-    } catch (error) {
-      console.error(`[PDF] ❌ Failed: ${imageUrl}`, error.message);
-      content = content.replace(fullMatch, `*[Image: ${alt}]*`);
-    }
-  }
-  
-  console.log(`[PDF] Image conversion complete`);
-  return content;
-}
-
-/**
- * Escape HTML special characters
- */
+// Escape HTML special characters
 function escapeHtml(text) {
   const map = {
     '&': '&amp;',
@@ -106,11 +17,168 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
-/ ✅ NEW: Special handler for Schemes of Work
+// Special handler for Lesson Concept Breakdown
+function handleLessonConceptBreakdown(markdown) {
+  const lines = markdown.split('\n');
+  let inMainTable = false;
+  let headers = [];
+  let dataRows = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines and metadata
+    if (!line || line.startsWith('SCHOOL:') || line.startsWith('FACILITATOR:')) {
+      continue;
+    }
+    
+    // Look for table header with actual content
+    if (line.includes('|') && 
+        (line.toLowerCase().includes('week') && 
+         (line.toLowerCase().includes('strand') ||
+          line.toLowerCase().includes('learning concept')))) {
+      
+      const potentialHeaders = line.split('|').map(c => c.trim()).filter(c => c);
+      if (potentialHeaders.length >= 4 && potentialHeaders[0].toLowerCase().includes('week')) {
+        headers = potentialHeaders;
+        inMainTable = true;
+        console.log('[PDF] Found main table headers:', headers);
+        continue;
+      }
+    }
+    
+    // Collect table data rows
+    if (inMainTable && line.includes('|')) {
+      const cells = line.split('|').map(c => c.trim()).filter(c => c);
+      
+      if (cells.length >= 4 && cells[0].toLowerCase().includes('week')) {
+        let row = cells;
+        if (row.length === 4) {
+          row.push('Were learners able to meet the learning objectives?');
+        }
+        dataRows.push(row);
+      }
+    }
+    
+    // Stop when we hit non-table content
+    if (inMainTable && !line.includes('|') && line.length > 0) {
+      if (dataRows.length > 0) break;
+      inMainTable = false;
+    }
+  }
+  
+  if (dataRows.length === 0) {
+    return parseLessonConceptFallback(markdown);
+  }
+  
+  let html = '<table class="data-table">\n';
+  
+  const standardHeaders = ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'];
+  html += '  <thead>\n    <tr>\n';
+  standardHeaders.forEach(header => {
+    html += `      <th>${escapeHtml(header)}</th>\n`;
+  });
+  html += '    </tr>\n  </thead>\n';
+  
+  html += '  <tbody>\n';
+  dataRows.forEach(row => {
+    html += '    <tr>\n';
+    
+    const week = row[0] || '';
+    const strand = row[1] || '';
+    const substrand = row[2] || '';
+    const concept = row[3] || '';
+    const reflection = row[4] || 'Were learners able to meet the learning objectives?';
+    
+    [week, strand, substrand, concept, reflection].forEach(cell => {
+      html += `      <td>${escapeHtml(cell)}</td>\n`;
+    });
+    
+    html += '    </tr>\n';
+  });
+  html += '  </tbody>\n</table>\n';
+  
+  console.log(`[PDF] Built Lesson Concept Breakdown table with ${dataRows.length} rows`);
+  return html;
+}
+
+// Fallback for Lesson Concept Breakdown
+function parseLessonConceptFallback(markdown) {
+  const lines = markdown.split('\n');
+  const rows = [];
+  let currentWeek = '';
+  let currentStrand = '';
+  let currentSubstrand = '';
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    const weekMatch = trimmed.match(/Week\s+(\d+)/i);
+    if (weekMatch) {
+      currentWeek = `Week ${weekMatch[1]}`;
+    }
+    
+    if (trimmed.includes('|')) {
+      const cells = trimmed.split('|').map(c => c.trim()).filter(c => c);
+      
+      if (cells.length >= 3) {
+        if (cells[0] && cells[0].length > 2 && 
+            !cells[0].toLowerCase().includes('week') &&
+            !cells[0].toLowerCase().includes('stand')) {
+          
+          if (!currentStrand && cells[0].length > 3) {
+            currentStrand = cells[0];
+          }
+          if (!currentSubstrand && cells[1] && cells[1].length > 3) {
+            currentSubstrand = cells[1];
+          }
+          
+          const conceptIdx = cells.length === 3 ? 2 : (cells.length === 4 ? 3 : 2);
+          const concept = cells[conceptIdx];
+          
+          if (concept && concept.length > 10 && !concept.toLowerCase().includes('learning concept')) {
+            rows.push([
+              currentWeek || 'Week 1',
+              currentStrand || '',
+              currentSubstrand || '',
+              concept,
+              'Were learners able to meet the learning objectives?'
+            ]);
+          }
+        }
+      }
+    }
+  }
+  
+  if (rows.length > 0) {
+    let html = '<table class="data-table">\n';
+    html += '  <thead>\n    <tr>\n';
+    ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'].forEach(header => {
+      html += `      <th>${escapeHtml(header)}</th>\n`;
+    });
+    html += '    </tr>\n  </thead>\n';
+    
+    html += '  <tbody>\n';
+    rows.forEach(row => {
+      html += '    <tr>\n';
+      row.forEach(cell => {
+        html += `      <td>${escapeHtml(cell)}</td>\n`;
+      });
+      html += '    </tr>\n';
+    });
+    html += '  </tbody>\n</table>\n';
+    
+    console.log(`[PDF] Fallback parsing extracted ${rows.length} rows`);
+    return html;
+  }
+  
+  return '<p>Table content could not be parsed for PDF generation.</p>';
+}
+
+// Special handler for Schemes of Work
 function handleSchemesOfWork(markdown) {
   const lines = markdown.split('\n');
   let inTable = false;
-  let tableLines = [];
   let headers = [];
   let dataRows = [];
   
@@ -119,17 +187,15 @@ function handleSchemesOfWork(markdown) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Skip empty lines and metadata
     if (!line) continue;
     
     // Look for table header with 10 columns
     if (line.includes('|') && 
         (line.toLowerCase().includes('week') && 
          line.toLowerCase().includes('lesson') &&
-         line.toLowerCase().includes('specific learning outcomes') ||
-         line.toLowerCase().includes('slo)'))) {
+         (line.toLowerCase().includes('specific learning outcomes') ||
+          line.toLowerCase().includes('slo)')))) {
       
-      // Check if this looks like a proper Schemes header
       const potentialHeaders = line.split('|').map(c => c.trim()).filter(c => c);
       if (potentialHeaders.length >= 8) {
         headers = potentialHeaders;
@@ -139,33 +205,27 @@ function handleSchemesOfWork(markdown) {
       }
     }
     
-    // Collect table data rows
     if (inTable && line.includes('|')) {
       const cells = line.split('|').map(c => c.trim()).filter(c => c);
       
-      // Look for actual data rows (not separators or empty)
       if (cells.length >= 8 && cells[0].toLowerCase().includes('week')) {
         dataRows.push(cells);
       }
     }
     
-    // Stop when we hit non-table content
     if (inTable && !line.includes('|') && line.length > 50) {
       if (dataRows.length > 0) break;
       inTable = false;
     }
   }
   
-  // If no standard table found, try alternative parsing
   if (dataRows.length === 0) {
     console.log('[PDF] Using alternative Schemes parsing');
     return parseSchemesFallback(markdown);
   }
   
-  // Build HTML table
   let html = '<table class="data-table">\n';
   
-  // Header - ensure we have 10 columns
   const standardHeaders = [
     'WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 
     'SPECIFIC LEARNING OUTCOMES (SLO)', 'LEARNING EXPERIENCES', 
@@ -179,20 +239,16 @@ function handleSchemesOfWork(markdown) {
   });
   html += '    </tr>\n  </thead>\n';
   
-  // Body
   html += '  <tbody>\n';
   dataRows.forEach(row => {
     html += '    <tr>\n';
     
-    // Ensure exactly 10 columns
     let paddedRow = [...row];
     
-    // Pad missing columns
     while (paddedRow.length < 10) {
       paddedRow.push('');
     }
     
-    // Trim if too many
     if (paddedRow.length > 10) {
       paddedRow = paddedRow.slice(0, 10);
     }
@@ -205,29 +261,26 @@ function handleSchemesOfWork(markdown) {
   });
   html += '  </tbody>\n</table>\n';
   
-  console.log(`[PDF] ✅ Built Schemes of Work table with ${dataRows.length} rows`);
+  console.log(`[PDF] Built Schemes of Work table with ${dataRows.length} rows`);
   return html;
 }
 
-// ✅ Fallback parsing for Schemes of Work
+// Fallback for Schemes of Work
 function parseSchemesFallback(markdown) {
   const lines = markdown.split('\n');
   const rows = [];
   let currentWeek = '';
   
-  // Look for pattern: | Week X | Lesson Y | ... |
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     if (!line || !line.includes('|')) continue;
     
-    // Extract week from line
     const weekMatch = line.match(/Week\s+(\d+)/i);
     if (weekMatch) {
       currentWeek = `Week ${weekMatch[1]}`;
     }
     
-    // Try to parse as a Schemes row
     const cells = line.split('|').map(c => c.trim()).filter(c => c);
     
     if (cells.length >= 5 && (
@@ -236,7 +289,6 @@ function parseSchemesFallback(markdown) {
         /^\d+$/.test(cells[0]) ||
         /^lesson\s*\d+$/i.test(cells[1])
     )) {
-      // Build a proper 10-column row
       const row = [
         cells[0] || currentWeek,
         cells[1] || '',
@@ -254,7 +306,6 @@ function parseSchemesFallback(markdown) {
     }
   }
   
-  // Build HTML table from extracted rows
   if (rows.length > 0) {
     let html = '<table class="data-table">\n';
     html += '  <thead>\n    <tr>\n';
@@ -280,15 +331,14 @@ function parseSchemesFallback(markdown) {
     });
     html += '  </tbody>\n</table>\n';
     
-    console.log(`[PDF] ✅ Fallback parsing extracted ${rows.length} Schemes rows`);
+    console.log(`[PDF] Fallback parsing extracted ${rows.length} Schemes rows`);
     return html;
   }
   
-  // Last resort: extract all table-like content
   return extractAnyTable(markdown);
 }
 
-// ✅ Extract any table content
+// Extract any table content
 function extractAnyTable(markdown) {
   const lines = markdown.split('\n');
   let html = '<table class="data-table">\n';
@@ -299,21 +349,18 @@ function extractAnyTable(markdown) {
     
     if (!line || !line.includes('|')) continue;
     
-    // Skip separator rows
     if (line.match(/^[\|\-\s:]+$/)) continue;
     
     const cells = line.split('|').map(c => c.trim()).filter(c => c);
     
     if (cells.length >= 3) {
       if (foundRows === 0) {
-        // First row = headers
         html += '  <thead>\n    <tr>\n';
         cells.forEach(cell => {
           html += `      <th>${escapeHtml(cell)}</th>\n`;
         });
         html += '    </tr>\n  </thead>\n<tbody>\n';
       } else {
-        // Data rows
         html += '    <tr>\n';
         cells.forEach(cell => {
           html += `      <td>${escapeHtml(cell)}</td>\n`;
@@ -326,266 +373,14 @@ function extractAnyTable(markdown) {
   
   if (foundRows > 0) {
     html += '  </tbody>\n</table>\n';
-    console.log(`[PDF] ✅ Extracted ${foundRows} rows from any table`);
+    console.log(`[PDF] Extracted ${foundRows} rows from any table`);
     return html;
   }
   
   return '<p>Table content could not be parsed.</p>';
 }
 
-/**
- * ✅ NEW: Special handler for Lesson Concept Breakdown
- */
-function handleLessonConceptBreakdown(markdown) {
-  const lines = markdown.split('\n');
-  let inMainTable = false;
-  let tableLines = [];
-  let headers = [];
-  let dataRows = [];
-  
-  // Look for the main table (not the empty header table)
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Skip empty lines and metadata
-    if (!line || line.startsWith('SCHOOL:') || line.startsWith('FACILITATOR:')) {
-      continue;
-    }
-    
-    // Look for table header with actual content
-    if (line.includes('|') && 
-        (line.toLowerCase().includes('week') && 
-         (line.toLowerCase().includes('strand') ||
-          line.toLowerCase().includes('learning concept')))) {
-      
-      // Check if this header has actual column names (not empty)
-      const potentialHeaders = line.split('|').map(c => c.trim()).filter(c => c);
-      if (potentialHeaders.length >= 4 && potentialHeaders[0].toLowerCase().includes('week')) {
-        headers = potentialHeaders;
-        inMainTable = true;
-        console.log('[PDF] Found main table headers:', headers);
-        continue;
-      }
-    }
-    
-    // Collect table data rows
-    if (inMainTable && line.includes('|')) {
-      const cells = line.split('|').map(c => c.trim()).filter(c => c);
-      
-      // Only add rows with actual content
-      if (cells.length >= 4 && cells[0].toLowerCase().includes('week')) {
-        // Ensure we have 5 columns (add Reflection if missing)
-        let row = cells;
-        if (row.length === 4) {
-          row.push('Were learners able to meet the learning objectives?');
-        }
-        dataRows.push(row);
-      }
-    }
-    
-    // Stop when we hit non-table content
-    if (inMainTable && !line.includes('|') && line.length > 0) {
-      if (dataRows.length > 0) break; // We have data, stop
-      inMainTable = false; // No data yet, keep looking
-    }
-  }
-  
-  // If no table found with above method, try alternative parsing
-  if (dataRows.length === 0) {
-    console.log('[PDF] Using alternative table parsing');
-    return parseLessonConceptFallback(markdown);
-  }
-  
-  // Build HTML table
-  let html = '<table class="data-table">\n';
-  
-  // Header - always use standard 5 columns for Lesson Concept Breakdown
-  const standardHeaders = ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'];
-  html += '  <thead>\n    <tr>\n';
-  standardHeaders.forEach(header => {
-    html += `      <th>${escapeHtml(header)}</th>\n`;
-  });
-  html += '    </tr>\n  </thead>\n';
-  
-  // Body
-  html += '  <tbody>\n';
-  dataRows.forEach(row => {
-    html += '    <tr>\n';
-    
-    // Ensure exactly 5 columns
-    const week = row[0] || '';
-    const strand = row[1] || '';
-    const substrand = row[2] || '';
-    const concept = row[3] || '';
-    const reflection = row[4] || 'Were learners able to meet the learning objectives?';
-    
-    [week, strand, substrand, concept, reflection].forEach(cell => {
-      html += `      <td>${escapeHtml(cell)}</td>\n`;
-    });
-    
-    html += '    </tr>\n';
-  });
-  html += '  </tbody>\n</table>\n';
-  
-  console.log(`[PDF] ✅ Built Lesson Concept Breakdown table with ${dataRows.length} rows`);
-  return html;
-}
-
-// ✅ Fallback parsing for malformed Lesson Concept Breakdown content
-function parseLessonConceptFallback(markdown) {
-  const lines = markdown.split('\n');
-  const rows = [];
-  
-  // Extract week-based patterns
-  let currentWeek = '';
-  let currentStrand = '';
-  let currentSubstrand = '';
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
-    // Extract week
-    const weekMatch = trimmed.match(/Week\s+(\d+)/i);
-    if (weekMatch) {
-      currentWeek = `Week ${weekMatch[1]}`;
-    }
-    
-    // Extract strand/substrand from table rows
-    if (trimmed.includes('|')) {
-      const cells = trimmed.split('|').map(c => c.trim()).filter(c => c);
-      
-      if (cells.length >= 3) {
-        // Look for pattern: | Strand | Sub-strand | Concept |
-        if (cells[0] && cells[0].length > 2 && 
-            !cells[0].toLowerCase().includes('week') &&
-            !cells[0].toLowerCase().includes('stand')) {
-          
-          if (!currentStrand && cells[0].length > 3) {
-            currentStrand = cells[0];
-          }
-          if (!currentSubstrand && cells[1] && cells[1].length > 3) {
-            currentSubstrand = cells[1];
-          }
-          
-          // If we have a concept in position 2 or 3
-          const conceptIdx = cells.length === 3 ? 2 : (cells.length === 4 ? 3 : 2);
-          const concept = cells[conceptIdx];
-          
-          if (concept && concept.length > 10 && !concept.toLowerCase().includes('learning concept')) {
-            rows.push([
-              currentWeek || 'Week 1',
-              currentStrand || '',
-              currentSubstrand || '',
-              concept,
-              'Were learners able to meet the learning objectives?'
-            ]);
-          }
-        }
-      }
-    }
-  }
-  
-  // Build HTML from extracted rows
-  if (rows.length > 0) {
-    let html = '<table class="data-table">\n';
-    html += '  <thead>\n    <tr>\n';
-    ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'].forEach(header => {
-      html += `      <th>${escapeHtml(header)}</th>\n`;
-    });
-    html += '    </tr>\n  </thead>\n';
-    
-    html += '  <tbody>\n';
-    rows.forEach(row => {
-      html += '    <tr>\n';
-      row.forEach(cell => {
-        html += `      <td>${escapeHtml(cell)}</td>\n`;
-      });
-      html += '    </tr>\n';
-    });
-    html += '  </tbody>\n</table>\n';
-    
-    console.log(`[PDF] ✅ Fallback parsing extracted ${rows.length} rows`);
-    return html;
-  }
-  
-  // Last resort: return simple table message
-  return '<p>Table content could not be parsed for PDF generation.</p>';
-}
-
-/**
- * Convert markdown to HTML with special handling for Lesson Concept Breakdown
- */
-function markdownToHtmlWithTables(markdown, baseUrl, documentType) {
-  if (!markdown) return '<p>No content available</p>';
-  
-  console.log('[PDF] Document type:', documentType);
-  console.log('[PDF] Markdown sample:', markdown.substring(0, 500));
-  
-  // ✅ SPECIAL HANDLING FOR LESSON CONCEPT BREAKDOWN
-  if (documentType === 'Lesson Concept Breakdown') {
-    console.log('[PDF] Processing Lesson Concept Breakdown specifically');
-    return handleLessonConceptBreakdown(markdown);
-  }
-  
-  // ✅ NEW: SPECIAL HANDLING FOR SCHEMES OF WORK
-  if (documentType === 'Schemes of Work') {
-    console.log('[PDF] Processing Schemes of Work specifically');
-    return handleSchemesOfWork(markdown);
-  }
-  
-  let html = markdown;
-  
-  // Handle base64 images first
-  html = html.replace(/!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, (match, alt, base64Data) => {
-    return `
-  <div class="image-container">
-    <img src="${base64Data}" alt="${alt}" class="diagram-image" />
-    <p class="image-caption">${alt}</p>
-  </div>`;
-  });
-  
-  // ✅ CRITICAL: Convert markdown tables BEFORE other conversions
-  html = convertMarkdownTablesToHTML(html);
-  
-  // Remove diagram placeholders
-  html = html.replace(/\[DIAGRAM:[^\]]+\]/g, '');
-  html = html.replace(/\*\[Diagram unavailable\]\*/g, '');
-  
-  // Convert headings
-  html = html.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
-  
-  // Convert bold and italic
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-  html = html.replace(/_(.*?)_/g, '<em>$1</em>');
-  
-  // Convert lists
-  html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*?<\/li>\n?)+/g, match => {
-    if (!match.includes('<ol>') && !match.includes('<table>')) {
-      return '<ul>' + match + '</ul>';
-    }
-    return match;
-  });
-  
-  // Convert paragraphs
-  html = html.split('\n\n').map(block => {
-    block = block.trim();
-    if (!block) return '';
-    if (block.startsWith('<')) return block;
-    if (block.includes('<table>')) return block;
-    return `<p>${block.replace(/\n/g, '<br>')}</p>`;
-  }).join('\n');
-  
-  return html;
-}
-
-// ✅ NEW: Dedicated table conversion function
+// Convert markdown tables to HTML
 function convertMarkdownTablesToHTML(content) {
   const lines = content.split('\n');
   const result = [];
@@ -595,7 +390,6 @@ function convertMarkdownTablesToHTML(content) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Detect table line (has pipes and isn't just separator)
     if (line.includes('|') && !line.match(/^[\|\-\s:]+$/)) {
       if (!inTable) {
         inTable = true;
@@ -603,7 +397,6 @@ function convertMarkdownTablesToHTML(content) {
       }
       currentTable.push(line);
     } else {
-      // End of table
       if (inTable && currentTable.length > 0) {
         result.push(buildHTMLTableFromLines(currentTable));
         currentTable = [];
@@ -613,7 +406,6 @@ function convertMarkdownTablesToHTML(content) {
     }
   }
   
-  // Handle table at end
   if (inTable && currentTable.length > 0) {
     result.push(buildHTMLTableFromLines(currentTable));
   }
@@ -621,49 +413,36 @@ function convertMarkdownTablesToHTML(content) {
   return result.join('\n');
 }
 
-// ✅ Build HTML table from markdown lines with PROPER column handling
+// Build HTML table from markdown lines
 function buildHTMLTableFromLines(tableLines) {
   if (tableLines.length === 0) return '';
   
-  console.log('[PDF] Building table from', tableLines.length, 'lines');
-  
-  // Parse all rows first
   const allRows = tableLines.map(line => {
     let clean = line.trim();
-    // Remove leading/trailing pipes
     if (clean.startsWith('|')) clean = clean.substring(1);
     if (clean.endsWith('|')) clean = clean.substring(0, clean.length - 1);
     
     return clean
       .split('|')
       .map(cell => cell.trim())
-      .filter(cell => cell !== ''); // Remove empty cells
+      .filter(cell => cell !== '');
   }).filter(row => row.length > 0);
   
   if (allRows.length === 0) return '';
   
-  console.log('[PDF] Parsed', allRows.length, 'rows');
-  console.log('[PDF] First row:', allRows[0]);
-  
-  // Find separator row (contains only dashes, colons, spaces)
   let separatorIndex = -1;
   for (let i = 0; i < allRows.length; i++) {
     if (allRows[i].every(cell => /^[-:\s]+$/.test(cell))) {
       separatorIndex = i;
-      console.log('[PDF] Found separator at index', i);
       break;
     }
   }
   
-  // Determine column count from header
   const columnCount = separatorIndex > 0 ? allRows[0].length : 
                       Math.max(...allRows.map(row => row.length));
   
-  console.log('[PDF] Table has', columnCount, 'columns');
-  
   let html = '<table class="data-table">\n';
   
-  // Build header (rows before separator, or first row if no separator)
   const headerEndIndex = separatorIndex > 0 ? separatorIndex : 1;
   if (headerEndIndex > 0) {
     html += '  <thead>\n';
@@ -671,7 +450,6 @@ function buildHTMLTableFromLines(tableLines) {
       html += '    <tr>\n';
       const row = allRows[i];
       
-      // Pad row to match column count
       while (row.length < columnCount) {
         row.push('');
       }
@@ -684,29 +462,24 @@ function buildHTMLTableFromLines(tableLines) {
     html += '  </thead>\n';
   }
   
-  // Build body (rows after separator)
   html += '  <tbody>\n';
   const bodyStartIndex = separatorIndex > 0 ? separatorIndex + 1 : headerEndIndex;
   
   for (let i = bodyStartIndex; i < allRows.length; i++) {
     const row = allRows[i];
     
-    // Skip if it's another separator
     if (row.every(cell => /^[-:\s]+$/.test(cell))) {
       continue;
     }
     
-    // Skip if row has no meaningful content
     if (row.every(cell => !cell || cell.length < 1)) {
       continue;
     }
     
-    // ✅ CRITICAL FIX: Pad row to match column count
     while (row.length < columnCount) {
       row.push('');
     }
     
-    // ✅ CRITICAL FIX: Trim row if it has too many columns
     if (row.length > columnCount) {
       row.length = columnCount;
     }
@@ -724,14 +497,76 @@ function buildHTMLTableFromLines(tableLines) {
   return html;
 }
 
+// Main markdown to HTML function
+function markdownToHtmlWithTables(markdown, baseUrl, documentType) {
+  if (!markdown) return '<p>No content available</p>';
+  
+  console.log('[PDF] Document type:', documentType);
+  
+  // Special handling for Lesson Concept Breakdown
+  if (documentType === 'Lesson Concept Breakdown') {
+    console.log('[PDF] Processing Lesson Concept Breakdown specifically');
+    return handleLessonConceptBreakdown(markdown);
+  }
+  
+  // Special handling for Schemes of Work
+  if (documentType === 'Schemes of Work') {
+    console.log('[PDF] Processing Schemes of Work specifically');
+    return handleSchemesOfWork(markdown);
+  }
+  
+  let html = markdown;
+  
+  html = html.replace(/!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, (match, alt, base64Data) => {
+    return `
+  <div class="image-container">
+    <img src="${base64Data}" alt="${alt}" class="diagram-image" />
+    <p class="image-caption">${alt}</p>
+  </div>`;
+  });
+  
+  html = convertMarkdownTablesToHTML(html);
+  
+  html = html.replace(/\[DIAGRAM:[^\]]+\]/g, '');
+  html = html.replace(/\*\[Diagram unavailable\]\*/g, '');
+  
+  html = html.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+  
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+  
+  html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>\n?)+/g, match => {
+    if (!match.includes('<ol>') && !match.includes('<table>')) {
+      return '<ul>' + match + '</ul>';
+    }
+    return match;
+  });
+  
+  html = html.split('\n\n').map(block => {
+    block = block.trim();
+    if (!block) return '';
+    if (block.startsWith('<')) return block;
+    if (block.includes('<table>')) return block;
+    return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+  }).join('\n');
+  
+  return html;
+}
+
+// Build PDF HTML
 function buildPDFHTML(doc, contentHtml, isWide) {
-  // ✅ Determine if it's a Lesson Concept Breakdown (5 columns) or Schemes (10 columns)
   const isLessonConcept = doc.type === 'Lesson Concept Breakdown';
   const isSchemesOfWork = doc.type === 'Schemes of Work';
   const columnCount = isLessonConcept ? 5 : 10;
   const isWideFormat = isLessonConcept || isSchemesOfWork;
   
-  // ✅ Adjust font size based on content type
   const baseFontSize = isLessonConcept ? '9pt' : (isWideFormat ? '8pt' : '10pt');
   const tableFontSize = isLessonConcept ? '8pt' : (isWideFormat ? '6.5pt' : '8pt');
   
@@ -749,46 +584,118 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       background: #fff;
       padding: ${isWideFormat ? '10mm' : '15mm'};
     }
+    .document-header {
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+      page-break-after: avoid;
+    }
+    .document-header h1 {
+      font-size: ${isWideFormat ? '16pt' : '18pt'};
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .metadata { 
+      font-size: ${isWideFormat ? '7pt' : '8pt'}; 
+      color: #333; 
+    }
     
-    /* ... rest of your CSS ... */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: ${tableFontSize};
+      page-break-inside: auto;
+      table-layout: fixed;
+    }
+    .data-table th {
+      background-color: #2563eb !important;
+      color: white !important;
+      border: 1px solid #1e40af;
+      padding: ${isWideFormat ? '3px' : '4px'};
+      text-align: center;
+      font-weight: bold;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .data-table td {
+      border: 1px solid #333;
+      padding: ${isWideFormat ? '3px' : '4px'};
+      vertical-align: top;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      page-break-inside: avoid;
+      hyphens: auto;
+    }
     
-    /* ✅ SCHEMES OF WORK: 10-column layout */
-    ${!isLessonConcept ? `
+    ${isLessonConcept ? `
     .data-table th:nth-child(1),
-    .data-table td:nth-child(1) { width: 6%; }  /* Week */
+    .data-table td:nth-child(1) { width: 12%; }
     .data-table th:nth-child(2),
-    .data-table td:nth-child(2) { width: 6%; }  /* Lesson */
+    .data-table td:nth-child(2) { width: 10%; }
     .data-table th:nth-child(3),
-    .data-table td:nth-child(3) { width: 10%; } /* Strand */
+    .data-table td:nth-child(3) { width: 18%; }
     .data-table th:nth-child(4),
-    .data-table td:nth-child(4) { width: 10%; } /* Sub-strand */
+    .data-table td:nth-child(4) { width: 18%; }
     .data-table th:nth-child(5),
-    .data-table td:nth-child(5) { width: 18%; } /* SLO */
-    .data-table th:nth-child(6),
-    .data-table td:nth-child(6) { width: 15%; } /* Learning Experiences */
-    .data-table th:nth-child(7),
-    .data-table td:nth-child(7) { width: 12%; } /* KIQ */
-    .data-table th:nth-child(8),
-    .data-table td:nth-child(8) { width: 9%; }  /* Resources */
-    .data-table th:nth-child(9),
-    .data-table td:nth-child(9) { width: 7%; }  /* Assessment */
-    .data-table th:nth-child(10),
-    .data-table td:nth-child(10) { width: 7%; } /* Reflection */
+    .data-table td:nth-child(5) { width: 42%; }
     ` : `
-    /* ✅ LESSON CONCEPT BREAKDOWN: 5-column layout */
     .data-table th:nth-child(1),
-    .data-table td:nth-child(1) { width: 12%; } /* Term */
+    .data-table td:nth-child(1) { width: 6%; }
     .data-table th:nth-child(2),
-    .data-table td:nth-child(2) { width: 10%; } /* Week */
+    .data-table td:nth-child(2) { width: 6%; }
     .data-table th:nth-child(3),
-    .data-table td:nth-child(3) { width: 18%; } /* Strand */
+    .data-table td:nth-child(3) { width: 10%; }
     .data-table th:nth-child(4),
-    .data-table td:nth-child(4) { width: 18%; } /* Sub-strand */
+    .data-table td:nth-child(4) { width: 10%; }
     .data-table th:nth-child(5),
-    .data-table td:nth-child(5) { width: 42%; } /* Learning Concept */
+    .data-table td:nth-child(5) { width: 18%; }
+    .data-table th:nth-child(6),
+    .data-table td:nth-child(6) { width: 15%; }
+    .data-table th:nth-child(7),
+    .data-table td:nth-child(7) { width: 12%; }
+    .data-table th:nth-child(8),
+    .data-table td:nth-child(8) { width: 9%; }
+    .data-table th:nth-child(9),
+    .data-table td:nth-child(9) { width: 7%; }
+    .data-table th:nth-child(10),
+    .data-table td:nth-child(10) { width: 7%; }
     `}
     
-    /* ... rest of your CSS ... */
+    .data-table tbody tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    .data-table tbody tr:nth-child(even) { 
+      background-color: #f5f5f5 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    
+    @page { 
+      margin: 10mm; 
+      size: ${isWideFormat ? 'A3 landscape' : 'A4 portrait'}; 
+    }
+    
+    @media print {
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .data-table thead {
+        display: table-header-group;
+      }
+      .data-table tbody {
+        display: table-row-group;
+      }
+      .data-table tr {
+        page-break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
@@ -807,9 +714,7 @@ function buildPDFHTML(doc, contentHtml, isWide) {
 </html>`;
 }
 
-/**
- * MAIN PDF GENERATION FUNCTION
- */
+// MAIN PDF GENERATION FUNCTION
 exports.generatePDF = async (req, res) => {
   let browser;
   let tempFilePath;
@@ -833,18 +738,13 @@ exports.generatePDF = async (req, res) => {
     }
 
     console.log('[PDF] ✅ Document found:', doc.type);
-    console.log('[PDF] Content length:', doc.content?.length || 0);
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     console.log('[PDF] Base URL:', baseUrl);
     
-    // Process content
     let contentForPdf = doc.content || '';
     
-    // Replace diagram paths with base64 if available
     if (doc.diagrams && doc.diagrams.length > 0) {
-      console.log('[PDF] Processing', doc.diagrams.length, 'stored diagrams');
-      
       doc.diagrams.forEach((diagram, index) => {
         if (diagram.imageData) {
           const filenamePattern = diagram.fileName || `diagram-${index + 1}.png`;
@@ -858,19 +758,15 @@ exports.generatePDF = async (req, res) => {
       });
     }
 
-    // ✅ Convert to HTML with proper table handling
     console.log('[PDF] Converting to HTML...');
     const contentHtml = markdownToHtmlWithTables(contentForPdf, baseUrl, doc.type);
-    console.log('[PDF] ✅ HTML ready:', contentHtml.length, 'chars');
+    console.log('[PDF] ✅ HTML ready');
 
-    // ✅ Determine page format
     const isLessonConcept = doc.type === 'Lesson Concept Breakdown';
     const isSchemesOfWork = doc.type === 'Schemes of Work';
     const isWide = isLessonConcept || isSchemesOfWork;
     
-    // Launch browser
     console.log('[PDF] Launching browser...');
-    const isProduction = process.env.NODE_ENV === 'production';
     
     const launchOptions = {
       headless: 'new',
@@ -883,7 +779,7 @@ exports.generatePDF = async (req, res) => {
       ]
     };
     
-    if (isProduction) {
+    if (process.env.NODE_ENV === 'production') {
       const chromium = require('@sparticuz/chromium');
       launchOptions.executablePath = await chromium.executablePath();
       launchOptions.args = chromium.args;
@@ -896,17 +792,12 @@ exports.generatePDF = async (req, res) => {
 
     const page = await browser.newPage();
     
-    page.on('console', msg => console.log('[PDF Browser]', msg.text()));
-    page.on('pageerror', error => console.error('[PDF Browser Error]', error));
-    
-    // Build HTML
-    const html = buildPDFHTML(doc, contentHtml, isWide, isLessonConcept, isSchemesOfWork);
+    const html = buildPDFHTML(doc, contentHtml, isWide);
 
     console.log('[PDF] Setting content...');
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 90000 });
     console.log('[PDF] ✅ Content set');
     
-    // Wait for images
     await page.evaluate(() => {
       return Promise.all(
         Array.from(document.images)
@@ -921,7 +812,6 @@ exports.generatePDF = async (req, res) => {
     
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Create temp file
     const tempDir = path.join(__dirname, '..', 'temp');
     await fs.mkdir(tempDir, { recursive: true });
     tempFilePath = path.join(tempDir, `pdf-${Date.now()}.pdf`);
@@ -939,7 +829,6 @@ exports.generatePDF = async (req, res) => {
     await browser.close();
     browser = null;
 
-    // Send PDF
     const pdfBuffer = await fs.readFile(tempFilePath);
     await fs.unlink(tempFilePath);
     tempFilePath = null;
@@ -947,7 +836,6 @@ exports.generatePDF = async (req, res) => {
     const filename = `${doc.type.replace(/[^a-z0-9]/gi, '-')}-${doc.grade}-${Date.now()}.pdf`;
     
     console.log('[PDF] ✅ SUCCESS - Size:', pdfBuffer.length, 'bytes');
-    console.log('[PDF] ====================================================');
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -955,12 +843,9 @@ exports.generatePDF = async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (error) {
-    const totalTime = Date.now() - startTime;
     console.error('[PDF] ==================== ERROR ====================');
     console.error('[PDF] ❌ Type:', error.name);
     console.error('[PDF] ❌ Message:', error.message);
-    console.error('[PDF] ❌ Stack:', error.stack);
-    console.error('[PDF] ====================================================');
     
     if (browser) {
       try { await browser.close(); } catch (e) {}
@@ -978,7 +863,7 @@ exports.generatePDF = async (req, res) => {
   }
 };
 
-// ✅ Add the test endpoint
+// Test endpoint
 exports.testPDFTable = async (req, res) => {
   try {
     const { id } = req.params;
@@ -989,9 +874,7 @@ exports.testPDFTable = async (req, res) => {
     }
     
     console.log('Document type:', document.type);
-    console.log('Content preview:', document.content.substring(0, 500));
     
-    // Test the table parsing
     const ContentParser = require('../utils/contentProcessor');
     const parsed = ContentParser.parse(document.content, document.type);
     
@@ -1002,8 +885,7 @@ exports.testPDFTable = async (req, res) => {
       parsedType: parsed.type,
       headers: parsed.data?.headers || [],
       rowCount: parsed.data?.rows?.length || 0,
-      sampleRow: parsed.data?.rows?.[0] || [],
-      parsedData: parsed.data
+      sampleRow: parsed.data?.rows?.[0] || []
     });
     
   } catch (error) {

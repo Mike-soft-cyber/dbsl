@@ -2280,3 +2280,42 @@ function extractLearningConceptsFallback(content) {
   
   return concepts;
 }
+
+// Add to documentController.js
+exports.debugSchemesContent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const document = await Document.findById(id);
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    if (document.type !== 'Schemes of Work') {
+      return res.status(400).json({ error: 'Document is not Schemes of Work' });
+    }
+    
+    // Test ContentParser
+    const parsed = ContentParser.parse(document.content, 'Schemes of Work');
+    
+    // Test PDF parsing
+    const ContentParser = require('../utils/contentProcessor');
+    const pdfController = require('./pdfController');
+    
+    res.json({
+      success: true,
+      documentType: document.type,
+      contentLength: document.content.length,
+      contentPreview: document.content.substring(0, 500),
+      parsedType: parsed.type,
+      headers: parsed.data?.headers || [],
+      rowCount: parsed.data?.rows?.length || 0,
+      firstRow: parsed.data?.rows?.[0] || [],
+      columnCount: parsed.data?.headers?.length || 0
+    });
+    
+  } catch (error) {
+    console.error('Schemes debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
