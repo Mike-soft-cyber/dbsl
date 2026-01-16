@@ -12,19 +12,19 @@ class ContentParser {
     if (documentType === 'Lesson Concept Breakdown') {
       const tableData = this.parseLessonConceptTable(content);
       if (tableData && tableData.rows && tableData.rows.length > 0) {
-        console.log('[ContentParser] ✅ Successfully parsed Lesson Concept table with', tableData.rows.length, 'rows');
+        console.log('[ContentParser] âœ… Successfully parsed Lesson Concept table with', tableData.rows.length, 'rows');
         return { type: 'table', data: tableData };
       }
-      console.warn('[ContentParser] ⚠️ Failed to parse Lesson Concept table, falling back to markdown');
+      console.warn('[ContentParser] âš ï¸ Failed to parse Lesson Concept table, falling back to markdown');
     }
     
     if (documentType === 'Schemes of Work') {
       const tableData = this.parseSchemesTable(content, cbcEntry);
       if (tableData && tableData.rows && tableData.rows.length > 0) {
-        console.log('[ContentParser] ✅ Successfully parsed Schemes table with', tableData.rows.length, 'rows');
+        console.log('[ContentParser] âœ… Successfully parsed Schemes table with', tableData.rows.length, 'rows');
         return { type: 'table', data: tableData };
       }
-      console.warn('[ContentParser] ⚠️ Failed to parse Schemes table, falling back to markdown');
+      console.warn('[ContentParser] âš ï¸ Failed to parse Schemes table, falling back to markdown');
     }
     
     // Check for any table-like content
@@ -33,7 +33,7 @@ class ContentParser {
       console.log('[ContentParser] Detected', tableIndicators.length, 'table rows, attempting generic parse');
       const tableData = this.parseGenericTable(content);
       if (tableData && tableData.rows && tableData.rows.length > 0) {
-        console.log('[ContentParser] ✅ Successfully parsed generic table with', tableData.rows.length, 'rows');
+        console.log('[ContentParser] âœ… Successfully parsed generic table with', tableData.rows.length, 'rows');
         return { type: 'table', data: tableData };
       }
     }
@@ -87,7 +87,7 @@ class ContentParser {
       
       console.log('[Parser] Row', rowNumber, '- Raw cells:', cells.length, '-', cells.map(c => c.substring(0, 15)));
       
-      // ✅ FIX: Accept 4 or 5 columns
+      // âœ… FIX: Accept 4 or 5 columns
       if (cells.length >= 4 && cells.length <= 5) {
         let term, week, strand, substrand, concept;
         
@@ -111,19 +111,19 @@ class ContentParser {
           // Ensure we have 5 columns
           const row = [term || 'Term 1', week, strand || '', substrand || '', concept];
           tableData.rows.push(row);
-          console.log('[Parser] ✅ Added row', rowNumber, '- Week:', week);
+          console.log('[Parser] âœ… Added row', rowNumber, '- Week:', week);
           rowNumber++;
         } else {
-          console.log('[Parser] ⚠️ Invalid row - Week valid?', isValidWeek, '| Concept valid?', isValidConcept);
+          console.log('[Parser] âš ï¸ Invalid row - Week valid?', isValidWeek, '| Concept valid?', isValidConcept);
         }
       } else {
-        console.log('[Parser] ❌ Wrong column count:', cells.length, '(need 4-5)');
+        console.log('[Parser] âŒ Wrong column count:', cells.length, '(need 4-5)');
       }
     }
     
     // Safety limit
     if (tableData.rows.length >= 100) {
-      console.log('[Parser] ⚠️ Reached 100 row limit, stopping');
+      console.log('[Parser] âš ï¸ Reached 100 row limit, stopping');
       break;
     }
   }
@@ -156,7 +156,7 @@ class ContentParser {
       // Detect table start
       if (!foundTableStart && this.isSchemeHeaderLine(line)) {
         foundTableStart = true;
-        console.log('[Parser] ✅ Found schemes table header at line', i);
+        console.log('[Parser] âœ… Found schemes table header at line', i);
         continue;
       }
       
@@ -180,7 +180,7 @@ class ContentParser {
         
         console.log('[Parser] Row cells:', cells.length, '- First:', cells[0]?.substring(0, 15));
         
-        // ✅ STRICT: Only accept rows with exactly 10 columns
+        // âœ… STRICT: Only accept rows with exactly 10 columns
         if (cells.length === 10) {
           const week = cells[0];
           const lesson = cells[1];
@@ -198,12 +198,12 @@ class ContentParser {
           
           if (isValidRow) {
             tableData.rows.push(cells);
-            console.log('[Parser] ✅ Added row with WEEK:', week, 'REFLECTION:', reflection.substring(0, 30));
+            console.log('[Parser] âœ… Added row with WEEK:', week, 'REFLECTION:', reflection.substring(0, 30));
           } else {
-            console.log('[Parser] ⚠️ Invalid row - Week:', week, 'Lesson:', lesson, 'Has reflection:', !!reflection);
+            console.log('[Parser] âš ï¸ Invalid row - Week:', week, 'Lesson:', lesson, 'Has reflection:', !!reflection);
           }
         } else {
-          console.log('[Parser] ❌ Wrong column count:', cells.length, '(need exactly 10)');
+          console.log('[Parser] âŒ Wrong column count:', cells.length, '(need exactly 10)');
           
           // Log what's missing
           if (cells.length < 10) {
@@ -266,14 +266,14 @@ class ContentParser {
     }
     
     if (headerRow && dataRows.length > 0) {
-      console.log('[Parser] ✅ Generic table parsed:', dataRows.length, 'rows');
+      console.log('[Parser] âœ… Generic table parsed:', dataRows.length, 'rows');
       return {
         headers: headerRow,
         rows: dataRows
       };
     }
     
-    console.warn('[Parser] ❌ Generic table parse failed - Header:', !!headerRow, 'Rows:', dataRows.length);
+    console.warn('[Parser] âŒ Generic table parse failed - Header:', !!headerRow, 'Rows:', dataRows.length);
     return null;
   }
 
