@@ -646,42 +646,62 @@ function convertMarkdownTablesToHTML(content) {
   return result.join('\n');
 }
 
-// ✅ NEW: Build HTML table from markdown lines
+/// âœ… FIXED: Build HTML table from markdown lines with PROPER column handling
 function buildHTMLTableFromLines(tableLines) {
   if (tableLines.length === 0) return '';
   
-  // Parse all rows
-  const rows = tableLines.map(line => {
+  console.log('[PDF] Building table from', tableLines.length, 'lines');
+  
+  // Parse all rows first
+  const allRows = tableLines.map(line => {
     let clean = line.trim();
-    if (!clean.startsWith('|')) clean = '|' + clean;
-    if (!clean.endsWith('|')) clean = clean + '|';
+    // Remove leading/trailing pipes
+    if (clean.startsWith('|')) clean = clean.substring(1);
+    if (clean.endsWith('|')) clean = clean.substring(0, clean.length - 1);
     
     return clean
       .split('|')
       .map(cell => cell.trim())
-      .filter(cell => cell !== '');
-  });
+      .filter(cell => cell !== ''); // Remove empty cells
+  }).filter(row => row.length > 0);
   
-  if (rows.length === 0) return '';
+  if (allRows.length === 0) return '';
   
-  // Find separator (contains only dashes/colons)
-  let separatorIdx = -1;
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].every(cell => /^[-:\s]+$/.test(cell))) {
-      separatorIdx = i;
+  console.log('[PDF] Parsed', allRows.length, 'rows');
+  console.log('[PDF] First row:', allRows[0]);
+  
+  // Find separator row (contains only dashes, colons, spaces)
+  let separatorIndex = -1;
+  for (let i = 0; i < allRows.length; i++) {
+    if (allRows[i].every(cell => /^[-:\s]+$/.test(cell))) {
+      separatorIndex = i;
+      console.log('[PDF] Found separator at index', i);
       break;
     }
   }
   
+  // Determine column count from header
+  const columnCount = separatorIndex > 0 ? allRows[0].length : 
+                      Math.max(...allRows.map(row => row.length));
+  
+  console.log('[PDF] Table has', columnCount, 'columns');
+  
   let html = '<table class="data-table">\n';
   
-  // Headers (before separator)
-  const headerEnd = separatorIdx > 0 ? separatorIdx : 1;
-  if (headerEnd > 0) {
+  // Build header (rows before separator, or first row if no separator)
+  const headerEndIndex = separatorIndex > 0 ? separatorIndex : 1;
+  if (headerEndIndex > 0) {
     html += '  <thead>\n';
-    for (let i = 0; i < headerEnd; i++) {
+    for (let i = 0; i < headerEndIndex; i++) {
       html += '    <tr>\n';
-      rows[i].forEach(cell => {
+      const row = allRows[i];
+      
+      // Pad row to match column count
+      while (row.length < columnCount) {
+        row.push('');
+      }
+      
+      row.forEach(cell => {
         html += `      <th>${escapeHtml(cell)}</th>\n`;
       });
       html += '    </tr>\n';
@@ -689,16 +709,32 @@ function buildHTMLTableFromLines(tableLines) {
     html += '  </thead>\n';
   }
   
-  // Body (after separator)
+  // Build body (rows after separator)
   html += '  <tbody>\n';
-  const bodyStart = separatorIdx > 0 ? separatorIdx + 1 : headerEnd;
+  const bodyStartIndex = separatorIndex > 0 ? separatorIndex + 1 : headerEndIndex;
   
-  for (let i = bodyStart; i < rows.length; i++) {
-    const row = rows[i];
+  for (let i = bodyStartIndex; i < allRows.length; i++) {
+    const row = allRows[i];
     
-    // Skip empty or separator rows
-    if (row.every(cell => /^[-:\s]*$/.test(cell))) continue;
-    if (row.every(cell => !cell || cell.length < 1)) continue;
+    // Skip if it's another separator
+    if (row.every(cell => /^[-:\s]+$/.test(cell))) {
+      continue;
+    }
+    
+    // Skip if row has no meaningful content
+    if (row.every(cell => !cell || cell.length < 1)) {
+      continue;
+    }
+    
+    // âœ… CRITICAL FIX: Pad row to match column count
+    while (row.length < columnCount) {
+      row.push('');
+    }
+    
+    // âœ… CRITICAL FIX: Trim row if it has too many columns
+    if (row.length > columnCount) {
+      row.length = columnCount;
+    }
     
     html += '    <tr>\n';
     row.forEach(cell => {
@@ -713,8 +749,15 @@ function buildHTMLTableFromLines(tableLines) {
   return html;
 }
 
-// ✅ NEW: Build complete PDF HTML
 function buildPDFHTML(doc, contentHtml, isWide) {
+  // âœ… Determine if it's a Lesson Concept Breakdown (5 columns)
+  const isLessonConcept = doc.type === 'Lesson Concept Breakdown';
+  const columnCount = isLessonConcept ? 5 : 10;
+  
+  // âœ… Adjust font size based on content type
+  const baseFontSize = isLessonConcept ? '9pt' : (isWide ? '8pt' : '10pt');
+  const tableFontSize = isLessonConcept ? '8pt' : (isWide ? '6.5pt' : '8pt');
+  
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -723,7 +766,7 @@ function buildPDFHTML(doc, contentHtml, isWide) {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: ${isWide ? '8pt' : '10pt'};
+      font-size: ${baseFontSize};
       line-height: 1.4;
       color: #000;
       background: #fff;
@@ -744,21 +787,15 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       font-size: ${isWide ? '7pt' : '8pt'}; 
       color: #333; 
     }
-    .content h1 { font-size: 14pt; margin: 15px 0 8px; page-break-after: avoid; }
-    .content h2 { font-size: 12pt; margin: 12px 0 6px; page-break-after: avoid; }
-    .content h3 { font-size: 11pt; margin: 10px 0 5px; page-break-after: avoid; }
-    .content h4 { font-size: 10pt; margin: 8px 0 4px; page-break-after: avoid; }
-    .content p { margin-bottom: 6px; }
-    .content ul, .content ol { margin: 8px 0 8px 15px; }
-    .content li { margin-bottom: 3px; }
     
-    /* ✅ CRITICAL: Table styles for PDF */
+    /* âœ… CRITICAL: Table styles for PDF */
     .data-table {
       width: 100%;
       border-collapse: collapse;
       margin: 12px 0;
-      font-size: ${isWide ? '6.5pt' : '8pt'};
+      font-size: ${tableFontSize};
       page-break-inside: auto;
+      table-layout: fixed; /* âœ… IMPORTANT: Fixed layout for consistent columns */
     }
     .data-table th {
       background-color: #2563eb !important;
@@ -771,14 +808,55 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       page-break-inside: avoid;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .data-table td {
       border: 1px solid #333;
       padding: ${isWide ? '3px' : '4px'};
       vertical-align: top;
       word-wrap: break-word;
+      overflow-wrap: break-word;
       page-break-inside: avoid;
+      hyphens: auto;
     }
+    
+    /* âœ… LESSON CONCEPT BREAKDOWN: 5-column layout */
+    ${isLessonConcept ? `
+    .data-table th:nth-child(1),
+    .data-table td:nth-child(1) { width: 12%; } /* Term */
+    .data-table th:nth-child(2),
+    .data-table td:nth-child(2) { width: 10%; } /* Week */
+    .data-table th:nth-child(3),
+    .data-table td:nth-child(3) { width: 18%; } /* Strand */
+    .data-table th:nth-child(4),
+    .data-table td:nth-child(4) { width: 18%; } /* Sub-strand */
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5) { width: 42%; } /* Learning Concept */
+    ` : `
+    /* âœ… SCHEMES OF WORK: 10-column layout */
+    .data-table th:nth-child(1),
+    .data-table td:nth-child(1) { width: 6%; }  /* Week */
+    .data-table th:nth-child(2),
+    .data-table td:nth-child(2) { width: 6%; }  /* Lesson */
+    .data-table th:nth-child(3),
+    .data-table td:nth-child(3) { width: 10%; } /* Strand */
+    .data-table th:nth-child(4),
+    .data-table td:nth-child(4) { width: 10%; } /* Sub-strand */
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5) { width: 18%; } /* SLO */
+    .data-table th:nth-child(6),
+    .data-table td:nth-child(6) { width: 15%; } /* Learning Experiences */
+    .data-table th:nth-child(7),
+    .data-table td:nth-child(7) { width: 12%; } /* KIQ */
+    .data-table th:nth-child(8),
+    .data-table td:nth-child(8) { width: 9%; }  /* Resources */
+    .data-table th:nth-child(9),
+    .data-table td:nth-child(9) { width: 7%; }  /* Assessment */
+    .data-table th:nth-child(10),
+    .data-table td:nth-child(10) { width: 7%; } /* Reflection */
+    `}
+    
     .data-table tbody tr {
       page-break-inside: avoid;
       page-break-after: auto;
@@ -804,6 +882,9 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       }
       .data-table tbody {
         display: table-row-group;
+      }
+      .data-table tr {
+        page-break-inside: avoid;
       }
     }
   </style>

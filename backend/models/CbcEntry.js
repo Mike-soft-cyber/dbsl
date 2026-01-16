@@ -20,9 +20,9 @@ const cbcEntrySchema = new mongoose.Schema(
     lessonDuration: { type: Number },
     lessonsPerWeek: { type: Number },
     
-    slo: [{ type: String }],
-    learningExperiences: [{ type: String }],
-    keyInquiryQuestions: [{ type: String }],
+    slo: [{ type: String }], //Specific Learning Outcomes
+    learningExperiences: [{ type: String }], // Learning Experiences
+    keyInquiryQuestions: [{ type: String }], // Key Inquiry Questions
     resources: [{ type: String }],
     assessment: [assessmentSchema],
     reflection: [{ type: String }],
