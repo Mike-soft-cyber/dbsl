@@ -106,6 +106,233 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
+/ ✅ NEW: Special handler for Schemes of Work
+function handleSchemesOfWork(markdown) {
+  const lines = markdown.split('\n');
+  let inTable = false;
+  let tableLines = [];
+  let headers = [];
+  let dataRows = [];
+  
+  console.log('[PDF] Looking for Schemes of Work table...');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines and metadata
+    if (!line) continue;
+    
+    // Look for table header with 10 columns
+    if (line.includes('|') && 
+        (line.toLowerCase().includes('week') && 
+         line.toLowerCase().includes('lesson') &&
+         line.toLowerCase().includes('specific learning outcomes') ||
+         line.toLowerCase().includes('slo)'))) {
+      
+      // Check if this looks like a proper Schemes header
+      const potentialHeaders = line.split('|').map(c => c.trim()).filter(c => c);
+      if (potentialHeaders.length >= 8) {
+        headers = potentialHeaders;
+        inTable = true;
+        console.log('[PDF] Found Schemes table headers with', headers.length, 'columns');
+        continue;
+      }
+    }
+    
+    // Collect table data rows
+    if (inTable && line.includes('|')) {
+      const cells = line.split('|').map(c => c.trim()).filter(c => c);
+      
+      // Look for actual data rows (not separators or empty)
+      if (cells.length >= 8 && cells[0].toLowerCase().includes('week')) {
+        dataRows.push(cells);
+      }
+    }
+    
+    // Stop when we hit non-table content
+    if (inTable && !line.includes('|') && line.length > 50) {
+      if (dataRows.length > 0) break;
+      inTable = false;
+    }
+  }
+  
+  // If no standard table found, try alternative parsing
+  if (dataRows.length === 0) {
+    console.log('[PDF] Using alternative Schemes parsing');
+    return parseSchemesFallback(markdown);
+  }
+  
+  // Build HTML table
+  let html = '<table class="data-table">\n';
+  
+  // Header - ensure we have 10 columns
+  const standardHeaders = [
+    'WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 
+    'SPECIFIC LEARNING OUTCOMES (SLO)', 'LEARNING EXPERIENCES', 
+    'KEY INQUIRY QUESTION (KIQ)', 'LEARNING RESOURCES', 
+    'ASSESSMENT', 'REFLECTION'
+  ];
+  
+  html += '  <thead>\n    <tr>\n';
+  standardHeaders.forEach(header => {
+    html += `      <th>${escapeHtml(header)}</th>\n`;
+  });
+  html += '    </tr>\n  </thead>\n';
+  
+  // Body
+  html += '  <tbody>\n';
+  dataRows.forEach(row => {
+    html += '    <tr>\n';
+    
+    // Ensure exactly 10 columns
+    let paddedRow = [...row];
+    
+    // Pad missing columns
+    while (paddedRow.length < 10) {
+      paddedRow.push('');
+    }
+    
+    // Trim if too many
+    if (paddedRow.length > 10) {
+      paddedRow = paddedRow.slice(0, 10);
+    }
+    
+    paddedRow.forEach(cell => {
+      html += `      <td>${escapeHtml(cell)}</td>\n`;
+    });
+    
+    html += '    </tr>\n';
+  });
+  html += '  </tbody>\n</table>\n';
+  
+  console.log(`[PDF] ✅ Built Schemes of Work table with ${dataRows.length} rows`);
+  return html;
+}
+
+// ✅ Fallback parsing for Schemes of Work
+function parseSchemesFallback(markdown) {
+  const lines = markdown.split('\n');
+  const rows = [];
+  let currentWeek = '';
+  
+  // Look for pattern: | Week X | Lesson Y | ... |
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (!line || !line.includes('|')) continue;
+    
+    // Extract week from line
+    const weekMatch = line.match(/Week\s+(\d+)/i);
+    if (weekMatch) {
+      currentWeek = `Week ${weekMatch[1]}`;
+    }
+    
+    // Try to parse as a Schemes row
+    const cells = line.split('|').map(c => c.trim()).filter(c => c);
+    
+    if (cells.length >= 5 && (
+        cells[0].toLowerCase().includes('week') ||
+        cells[1]?.toLowerCase().includes('lesson') ||
+        /^\d+$/.test(cells[0]) ||
+        /^lesson\s*\d+$/i.test(cells[1])
+    )) {
+      // Build a proper 10-column row
+      const row = [
+        cells[0] || currentWeek,
+        cells[1] || '',
+        cells[2] || '',
+        cells[3] || '',
+        cells[4] || '',
+        cells[5] || 'Learners engage in activities',
+        cells[6] || 'What did we learn?',
+        cells[7] || 'Textbook, charts',
+        cells[8] || 'Observation',
+        cells[9] || 'Were learners able to meet objectives?'
+      ];
+      
+      rows.push(row);
+    }
+  }
+  
+  // Build HTML table from extracted rows
+  if (rows.length > 0) {
+    let html = '<table class="data-table">\n';
+    html += '  <thead>\n    <tr>\n';
+    const standardHeaders = [
+      'WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 
+      'SPECIFIC LEARNING OUTCOMES (SLO)', 'LEARNING EXPERIENCES', 
+      'KEY INQUIRY QUESTION (KIQ)', 'LEARNING RESOURCES', 
+      'ASSESSMENT', 'REFLECTION'
+    ];
+    
+    standardHeaders.forEach(header => {
+      html += `      <th>${escapeHtml(header)}</th>\n`;
+    });
+    html += '    </tr>\n  </thead>\n';
+    
+    html += '  <tbody>\n';
+    rows.forEach(row => {
+      html += '    <tr>\n';
+      row.forEach(cell => {
+        html += `      <td>${escapeHtml(cell)}</td>\n`;
+      });
+      html += '    </tr>\n';
+    });
+    html += '  </tbody>\n</table>\n';
+    
+    console.log(`[PDF] ✅ Fallback parsing extracted ${rows.length} Schemes rows`);
+    return html;
+  }
+  
+  // Last resort: extract all table-like content
+  return extractAnyTable(markdown);
+}
+
+// ✅ Extract any table content
+function extractAnyTable(markdown) {
+  const lines = markdown.split('\n');
+  let html = '<table class="data-table">\n';
+  let foundRows = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (!line || !line.includes('|')) continue;
+    
+    // Skip separator rows
+    if (line.match(/^[\|\-\s:]+$/)) continue;
+    
+    const cells = line.split('|').map(c => c.trim()).filter(c => c);
+    
+    if (cells.length >= 3) {
+      if (foundRows === 0) {
+        // First row = headers
+        html += '  <thead>\n    <tr>\n';
+        cells.forEach(cell => {
+          html += `      <th>${escapeHtml(cell)}</th>\n`;
+        });
+        html += '    </tr>\n  </thead>\n<tbody>\n';
+      } else {
+        // Data rows
+        html += '    <tr>\n';
+        cells.forEach(cell => {
+          html += `      <td>${escapeHtml(cell)}</td>\n`;
+        });
+        html += '    </tr>\n';
+      }
+      foundRows++;
+    }
+  }
+  
+  if (foundRows > 0) {
+    html += '  </tbody>\n</table>\n';
+    console.log(`[PDF] ✅ Extracted ${foundRows} rows from any table`);
+    return html;
+  }
+  
+  return '<p>Table content could not be parsed.</p>';
+}
+
 /**
  * ✅ NEW: Special handler for Lesson Concept Breakdown
  */
@@ -300,6 +527,12 @@ function markdownToHtmlWithTables(markdown, baseUrl, documentType) {
     return handleLessonConceptBreakdown(markdown);
   }
   
+  // ✅ NEW: SPECIAL HANDLING FOR SCHEMES OF WORK
+  if (documentType === 'Schemes of Work') {
+    console.log('[PDF] Processing Schemes of Work specifically');
+    return handleSchemesOfWork(markdown);
+  }
+  
   let html = markdown;
   
   // Handle base64 images first
@@ -492,13 +725,15 @@ function buildHTMLTableFromLines(tableLines) {
 }
 
 function buildPDFHTML(doc, contentHtml, isWide) {
-  // ✅ Determine if it's a Lesson Concept Breakdown (5 columns)
+  // ✅ Determine if it's a Lesson Concept Breakdown (5 columns) or Schemes (10 columns)
   const isLessonConcept = doc.type === 'Lesson Concept Breakdown';
+  const isSchemesOfWork = doc.type === 'Schemes of Work';
   const columnCount = isLessonConcept ? 5 : 10;
+  const isWideFormat = isLessonConcept || isSchemesOfWork;
   
   // ✅ Adjust font size based on content type
-  const baseFontSize = isLessonConcept ? '9pt' : (isWide ? '8pt' : '10pt');
-  const tableFontSize = isLessonConcept ? '8pt' : (isWide ? '6.5pt' : '8pt');
+  const baseFontSize = isLessonConcept ? '9pt' : (isWideFormat ? '8pt' : '10pt');
+  const tableFontSize = isLessonConcept ? '8pt' : (isWideFormat ? '6.5pt' : '8pt');
   
   return `<!DOCTYPE html>
 <html>
@@ -512,71 +747,13 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       line-height: 1.4;
       color: #000;
       background: #fff;
-      padding: ${isWide ? '10mm' : '15mm'};
-    }
-    .document-header {
-      border-bottom: 2px solid #000;
-      padding-bottom: 10px;
-      margin-bottom: 15px;
-      page-break-after: avoid;
-    }
-    .document-header h1 {
-      font-size: ${isWide ? '16pt' : '18pt'};
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    .metadata { 
-      font-size: ${isWide ? '7pt' : '8pt'}; 
-      color: #333; 
+      padding: ${isWideFormat ? '10mm' : '15mm'};
     }
     
-    /* ✅ CRITICAL: Table styles for PDF */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 12px 0;
-      font-size: ${tableFontSize};
-      page-break-inside: auto;
-      table-layout: fixed; /* ✅ IMPORTANT: Fixed layout for consistent columns */
-    }
-    .data-table th {
-      background-color: #2563eb !important;
-      color: white !important;
-      border: 1px solid #1e40af;
-      padding: ${isWide ? '3px' : '4px'};
-      text-align: center;
-      font-weight: bold;
-      page-break-after: avoid;
-      page-break-inside: avoid;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    .data-table td {
-      border: 1px solid #333;
-      padding: ${isWide ? '3px' : '4px'};
-      vertical-align: top;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      page-break-inside: avoid;
-      hyphens: auto;
-    }
+    /* ... rest of your CSS ... */
     
-    /* ✅ LESSON CONCEPT BREAKDOWN: 5-column layout */
-    ${isLessonConcept ? `
-    .data-table th:nth-child(1),
-    .data-table td:nth-child(1) { width: 12%; } /* Term */
-    .data-table th:nth-child(2),
-    .data-table td:nth-child(2) { width: 10%; } /* Week */
-    .data-table th:nth-child(3),
-    .data-table td:nth-child(3) { width: 18%; } /* Strand */
-    .data-table th:nth-child(4),
-    .data-table td:nth-child(4) { width: 18%; } /* Sub-strand */
-    .data-table th:nth-child(5),
-    .data-table td:nth-child(5) { width: 42%; } /* Learning Concept */
-    ` : `
     /* ✅ SCHEMES OF WORK: 10-column layout */
+    ${!isLessonConcept ? `
     .data-table th:nth-child(1),
     .data-table td:nth-child(1) { width: 6%; }  /* Week */
     .data-table th:nth-child(2),
@@ -597,38 +774,21 @@ function buildPDFHTML(doc, contentHtml, isWide) {
     .data-table td:nth-child(9) { width: 7%; }  /* Assessment */
     .data-table th:nth-child(10),
     .data-table td:nth-child(10) { width: 7%; } /* Reflection */
+    ` : `
+    /* ✅ LESSON CONCEPT BREAKDOWN: 5-column layout */
+    .data-table th:nth-child(1),
+    .data-table td:nth-child(1) { width: 12%; } /* Term */
+    .data-table th:nth-child(2),
+    .data-table td:nth-child(2) { width: 10%; } /* Week */
+    .data-table th:nth-child(3),
+    .data-table td:nth-child(3) { width: 18%; } /* Strand */
+    .data-table th:nth-child(4),
+    .data-table td:nth-child(4) { width: 18%; } /* Sub-strand */
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5) { width: 42%; } /* Learning Concept */
     `}
     
-    .data-table tbody tr {
-      page-break-inside: avoid;
-      page-break-after: auto;
-    }
-    .data-table tbody tr:nth-child(even) { 
-      background-color: #f5f5f5 !important;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    
-    @page { 
-      margin: 10mm; 
-      size: ${isWide ? 'A3 landscape' : 'A4 portrait'}; 
-    }
-    
-    @media print {
-      body {
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-      }
-      .data-table thead {
-        display: table-header-group;
-      }
-      .data-table tbody {
-        display: table-row-group;
-      }
-      .data-table tr {
-        page-break-inside: avoid;
-      }
-    }
+    /* ... rest of your CSS ... */
   </style>
 </head>
 <body>

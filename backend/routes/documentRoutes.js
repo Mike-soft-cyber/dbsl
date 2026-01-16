@@ -42,6 +42,8 @@ router.get('/breakdowns', async (req, res) => {
 
 router.post('/generate-scheme-from-breakdown/:breakdownId', authenticate, documentController.generateSchemeFromBreakdown);
 router.post('/generate-lesson-plan-from-breakdown/:breakdownId', authenticate, documentController.generateLessonPlanFromBreakdown);
+// Add to documentRoutes.js
+router.get('/:id/debug-schemes', documentController.debugSchemesContent);
 
 // More specific routes before generic :id routes
 router.get('/:schoolCode/count', documentController.getDocCountOfSchool);
