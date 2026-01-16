@@ -226,28 +226,45 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
   // ✅ FIX FOR LESSON CONCEPT BREAKDOWN
   else {
     // Check if WEEK column is missing
-    if (data.headers[0] !== 'WEEK' && !data.headers[0]?.toUpperCase().includes('WEEK')) {
-      console.warn('[TableView] ⚠️ Missing WEEK column - adding it');
-      fixedData.headers = ['WEEK', ...data.headers];
-      
-      const lessonsPerWeek = data.rows.length <= 50 ? 5 : 6;
-      
-      fixedData.rows = data.rows.map((row, idx) => {
-        const weekNum = Math.floor(idx / lessonsPerWeek) + 1;
-        return [`Week ${weekNum}`, ...row];
-      });
-    }
+    if (data.headers.some(h => h.toLowerCase().includes('learning concept'))) {
+    console.log('[TableView] ✅ Lesson Concept Breakdown detected');
     
-    // Check if REFLECTION column is missing
-    const lastHeader = fixedData.headers[fixedData.headers.length - 1];
-    if (!lastHeader?.toUpperCase().includes('REFLECTION')) {
-      console.warn('[TableView] ⚠️ Missing REFLECTION column - adding it');
-      fixedData.headers = [...fixedData.headers, 'REFLECTION'];
-      fixedData.rows = fixedData.rows.map(row => {
-        return [...row, 'Were learners able to meet the learning objectives?'];
+    const standardHeaders = ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'];
+    
+    // Ensure we have exactly 5 columns
+    if (data.headers.length !== 5 || !arraysEqual(data.headers.map(h => h.toUpperCase()), standardHeaders)) {
+      console.log('[TableView] ⚠️ Fixing columns for Lesson Concept Breakdown');
+      
+      fixedData.headers = standardHeaders;
+      
+      // Reconstruct rows with 5 columns
+      fixedData.rows = data.rows.map(row => {
+        const newRow = [...row];
+        
+        // Pad with empty values if needed
+        while (newRow.length < 4) newRow.push('');
+        
+        // Ensure we have Reflection column
+        if (newRow.length === 4) {
+          newRow.push('Were learners able to meet the learning objectives?');
+        }
+        
+        // Trim to 5 columns if needed
+        if (newRow.length > 5) newRow.length = 5;
+        
+        return newRow;
       });
     }
   }
+  }
+
+  function arraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
   console.log('[TableView] Final headers:', fixedData.headers.length, fixedData.headers);
 
