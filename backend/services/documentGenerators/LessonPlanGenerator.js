@@ -1,283 +1,172 @@
-// ✅ COMPLETE FIX FOR LESSON CONCEPT BREAKDOWN GENERATOR
-// Save this as: LessonConceptGenerator.js
-
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
-class FixedLessonConceptGenerator extends BaseDocumentGenerator {
+class LessonPlanGenerator extends BaseDocumentGenerator {
   constructor() {
-    super('Lesson Concept Breakdown');
+    super('Lesson Plan');
   }
 
   createPrompt(requestData, cbcEntry) {
     const { 
       school, teacherName, grade, learningArea, strand, substrand, term, 
-      weeks, lessonsPerWeek, lessonDuration, ageRange 
+      date, time, specificConcept, lessonNumber, weekNumber 
     } = requestData;
-    
-    // ✅ CRITICAL FIX: Use weeks and lessonsPerWeek from curriculum config
-    const safeWeeks = weeks || 10;
-    const safeLessonsPerWeek = lessonsPerWeek || 5;
-    
-    // ✅ CRITICAL FIX: Calculate total rows (WEEKS × LESSONS_PER_WEEK)
-    const totalRows = safeWeeks * safeLessonsPerWeek;
-    
+
+    // Extract and format CBC data
     const sloList = cbcEntry?.slo || [];
+    const learningExperiences = cbcEntry?.learningExperiences || [];
+    const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
+    const resources = cbcEntry?.resources || [];
+    const coreCompetencies = cbcEntry?.coreCompetencies || [];
+    const values = cbcEntry?.values || [];
     
-    if (!sloList || sloList.length === 0) {
-      throw new Error('No Specific Learning Outcomes (SLOs) found in CBC entry.');
+    // Format SLOs properly
+    let formattedSLOs = 'Not specified';
+    if (sloList.length > 0) {
+      formattedSLOs = sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n');
     }
-    
-    console.log(`[LessonConcept] ✅ Configuration:`, {
-      weeks: safeWeeks,
-      lessonsPerWeek: safeLessonsPerWeek,
-      totalRows: totalRows,
-      sloCount: sloList.length,
-      lessonDuration,
-      ageRange
-    });
 
-    return `Generate a Lesson Concept Breakdown table with EXACTLY ${totalRows} rows.
-
-CRITICAL FORMATTING REQUIREMENTS:
-✅ Each row MUST be on ONE continuous line
-✅ Use pipe (|) to separate columns
-✅ Generate EXACTLY ${totalRows} rows (no more, no less)
-✅ DO NOT add extra line breaks within cells
-✅ Each cell should be continuous text without newlines
-
-SCHOOL: ${this.escapeForPrompt(school)}
-FACILITATOR: ${this.escapeForPrompt(teacherName)}
-GRADE: ${this.escapeForPrompt(grade)}
-SUBJECT: ${this.escapeForPrompt(learningArea)}
-TERM: ${this.escapeForPrompt(term)}
-WEEKS: ${safeWeeks}
-LESSONS PER WEEK: ${safeLessonsPerWeek}
-TOTAL LESSONS: ${totalRows}
-LESSON DURATION: ${lessonDuration} minutes
-AGE RANGE: ${ageRange}
-
-## 🎯 MANDATORY REQUIREMENT: EXACT ROW COUNT
-
-You MUST generate EXACTLY ${totalRows} rows because:
-- WEEKS = ${safeWeeks}
-- LESSONS PER WEEK = ${safeLessonsPerWeek}
-- TOTAL ROWS = ${safeWeeks} × ${safeLessonsPerWeek} = ${totalRows}
-
-## CBC FRAMEWORK ALIGNMENT:
-
-### SPECIFIC LEARNING OUTCOMES (${sloList.length} available):
-${sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n')}
-
-## TABLE FORMAT - EXACTLY 5 COLUMNS:
-
-| Term | Week | Strand | Sub-strand | Learning Concept |
-|------|------|--------|------------|------------------|
-
-## EXAMPLE ROWS (showing correct format):
-
-| ${term} | Week 1 | ${this.escapeForPrompt(strand)} | ${this.escapeForPrompt(substrand)} | Identify materials for modeling |
-| ${term} | Week 1 | ${this.escapeForPrompt(strand)} | ${this.escapeForPrompt(substrand)} | Explore different textures of clay |
-| ${term} | Week 1 | ${this.escapeForPrompt(strand)} | ${this.escapeForPrompt(substrand)} | Practice rolling clay into balls |
-
-## DISTRIBUTION STRATEGY:
-
-${this.generateDistributionStrategy(sloList, safeWeeks, safeLessonsPerWeek)}
-
-## CRITICAL RULES:
-
-✅ DO:
-- Generate EXACTLY ${totalRows} rows (verify count before finishing)
-- Distribute ${safeLessonsPerWeek} lessons per week across ${safeWeeks} weeks
-- Use learning concepts from the SLOs
-- Keep each row on ONE continuous line
-- Ensure all ${safeWeeks} weeks are covered
-- Make concepts clear and educational
-
-❌ DON'T:
-- Generate more or fewer than ${totalRows} rows
-- Skip any weeks
-- Split cells across multiple lines
-- Add line breaks within cells
-- Create empty or placeholder concepts
-
-## HOW TO MEET THE ${totalRows} ROW REQUIREMENT:
-
-Since you have ${sloList.length} SLOs but need ${totalRows} learning concepts:
-
-${this.getExpansionGuidance(sloList.length, totalRows, safeWeeks, safeLessonsPerWeek)}
-
-## VALIDATION CHECKLIST:
-
-Before finishing, verify:
-☐ Row count = ${totalRows} (COUNT THEM!)
-☐ Weeks covered = ${safeWeeks}
-☐ Lessons per week = ${safeLessonsPerWeek}
-☐ Each row on ONE line
-☐ All concepts are educational
-☐ No empty cells
-☐ Proper pipe (|) separation
-
-OUTPUT FORMAT:
-
-First, output the table header:
-| Term | Week | Strand | Sub-strand | Learning Concept |
-|------|------|--------|------------|------------------|
-
-Then generate ALL ${totalRows} data rows following this pattern:
-| ${term} | Week X | ${this.escapeForPrompt(strand)} | ${this.escapeForPrompt(substrand)} | [Learning concept here] |
-
-Start generating now - remember: EXACTLY ${totalRows} rows!`;
-  }
-
-  generateDistributionStrategy(sloList, weeks, lessonsPerWeek) {
-    const totalRows = weeks * lessonsPerWeek;
-    const sloCount = sloList.length;
-    
-    let strategy = `**Distribution Strategy for ${totalRows} Rows:**\n\n`;
-    
-    if (totalRows === sloCount) {
-      strategy += `Perfect match! Use each SLO exactly once (1 SLO = 1 lesson).\n`;
-    } else if (totalRows > sloCount) {
-      const expansionFactor = Math.ceil(totalRows / sloCount);
-      strategy += `EXPAND ${sloCount} SLOs into ${totalRows} concepts.\n`;
-      strategy += `Strategy: Break each SLO into approximately ${expansionFactor} smaller concepts.\n\n`;
-      strategy += `Week-by-week breakdown:\n`;
-      for (let week = 1; week <= weeks; week++) {
-        const startLesson = (week - 1) * lessonsPerWeek + 1;
-        const endLesson = week * lessonsPerWeek;
-        strategy += `Week ${week}: Lessons ${startLesson}-${endLesson}\n`;
-      }
-    } else {
-      strategy += `CONDENSE ${sloCount} SLOs into ${totalRows} key concepts.\n`;
-      strategy += `Strategy: Group related SLOs and select the ${totalRows} most important concepts.\n`;
+    // Format learning experiences
+    let formattedExperiences = 'Not specified';
+    if (learningExperiences.length > 0) {
+      formattedExperiences = learningExperiences.map((exp, i) => `${i+1}. ${exp}`).join('\n');
     }
-    
-    return strategy;
-  }
 
-  getExpansionGuidance(sloCount, totalRows, weeks, lessonsPerWeek) {
-    if (totalRows > sloCount) {
-      const expansionFactor = Math.ceil(totalRows / sloCount);
-      return `You need to EXPAND ${sloCount} SLOs into ${totalRows} concepts:
-
-STRATEGY: Break down each SLO into ${expansionFactor} smaller, progressive learning concepts.
-
-Example: If SLO is "Understand photosynthesis"
-→ Break into:
-  1. Identify parts of a leaf
-  2. Describe the photosynthesis process
-  3. Explain factors affecting photosynthesis
-  4. Analyze importance of photosynthesis
-
-Apply this breakdown approach to all ${sloCount} SLOs to reach ${totalRows} total concepts.`;
-    } else if (totalRows < sloCount) {
-      return `You need to CONDENSE ${sloCount} SLOs into ${totalRows} concepts:
-
-STRATEGY: Group related SLOs and prioritize the ${totalRows} most essential concepts.`;
-    } else {
-      return `Perfect match! Use each of the ${sloCount} SLOs as one learning concept.`;
+    // Format key inquiry questions
+    let formattedQuestions = 'Not specified';
+    if (keyInquiryQuestions.length > 0) {
+      formattedQuestions = keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n');
     }
+
+    // Format resources
+    let formattedResources = 'Not specified';
+    if (resources.length > 0) {
+      formattedResources = resources.join(', ');
+    }
+
+    return `Generate a comprehensive Lesson Plan for Kenyan Competency Based Curriculum (CBC).
+
+═══════════════════════════════════════════════════════════════════
+📋 DOCUMENT INFORMATION
+═══════════════════════════════════════════════════════════════════
+
+SCHOOL: ${school}
+FACILITATOR: ${teacherName}
+GRADE: ${grade}
+SUBJECT: ${learningArea}
+TERM: ${term}
+LESSON NUMBER: ${lessonNumber || 'X'} of ${cbcEntry?.noOfLessons || 'X'} total lessons
+DATE: ${date || 'Thursday 29th January 2025'}
+TIME: ${time || '7:30 am – 8:10 am'}
+STRAND: ${strand}
+SUB-STRAND: ${substrand}
+
+═══════════════════════════════════════════════════════════════════
+🎯 SPECIFIC LEARNING CONCEPT FOR THIS LESSON
+═══════════════════════════════════════════════════════════════════
+
+${specificConcept || 'General concept related to the sub-strand'}
+
+═══════════════════════════════════════════════════════════════════
+📚 CBC CURRICULUM DATA
+═══════════════════════════════════════════════════════════════════
+
+SPECIFIC LEARNING OUTCOMES (SLO):
+${formattedSLOs}
+
+LEARNING EXPERIENCES:
+${formattedExperiences}
+
+KEY INQUIRY QUESTIONS:
+${formattedQuestions}
+
+LEARNING RESOURCES:
+${formattedResources}
+
+CORE COMPETENCIES:
+${coreCompetencies.length > 0 ? coreCompetencies.join(', ') : 'Communication and Collaboration, Critical Thinking and Problem Solving, Creativity and Innovation'}
+
+VALUES:
+${values.length > 0 ? values.join(', ') : 'Love, Responsibility, Respect, Unity, Peace'}
+
+═══════════════════════════════════════════════════════════════════
+📝 LESSON PLAN STRUCTURE REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
+
+Generate a COMPLETE lesson plan with these sections:
+
+1. LESSON TITLE: Create an engaging title for this lesson
+
+2. LESSON DURATION: 40 minutes (specify time allocation for each section)
+
+3. SPECIFIC LEARNING OUTCOMES (SLO):
+   By the end of the lesson, the learner should be able to:
+   - Outcome 1 (from CBC data above)
+   - Outcome 2 (from CBC data above)
+
+4. KEY INQUIRY QUESTION:
+   Use one of the questions from above
+
+5. LEARNING RESOURCES:
+   List specific resources needed
+
+6. ORGANIZATION OF LEARNING:
+   How learners will be organized (pairs, groups, individual)
+
+7. INTRODUCTION (5-7 minutes):
+   - How you will introduce the lesson
+   - Link to previous knowledge
+   - Capture learner interest
+
+8. LESSON DEVELOPMENT (25-30 minutes):
+   STEP 1: [Activity 1 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
+   
+   STEP 2: [Activity 2 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
+   
+   STEP 3: [Activity 3 with time allocation]
+     • Teacher Activity:
+     • Learner Activity:
+
+9. EXTENDED ACTIVITIES (5 minutes):
+   - Additional practice
+   - Homework assignment
+   - Further exploration
+
+10. CONCLUSION (5 minutes):
+    - Summary of key points
+    - Assessment of learning
+    - Preview of next lesson
+
+11. ASSESSMENT:
+    - Methods used during the lesson
+    - Criteria for success
+
+12. TEACHER'S REFLECTION:
+    - Questions to reflect on after the lesson
+    - Notes for improvement
+
+═══════════════════════════════════════════════════════════════════
+✅ QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
+
+• Use CLEAR, professional language suitable for ${grade} level
+• Include TIME ALLOCATIONS for each section (total 40 minutes)
+• Make activities PRACTICAL and engaging
+• Use Kenyan context and examples
+• Include differentiation strategies for diverse learners
+• Align activities directly with SLOs
+• Ensure assessment matches learning outcomes
+• Make it immediately usable by teachers
+
+═══════════════════════════════════════════════════════════════════
+🚀 START GENERATING NOW
+═══════════════════════════════════════════════════════════════════
+
+Generate a complete, ready-to-use lesson plan following the structure above.`;
   }
 }
 
-module.exports = FixedLessonConceptGenerator;
-
-// ============================================
-// ✅ CONTENT PROCESSOR FIX
-// Save this as: contentProcessor.js
-// ============================================
-
-/**
- * Post-process generated content to ensure proper formatting
- */
-function postProcessGeneratedContent(content, documentType) {
-  if (!content) return '';
-  
-  console.log(`[ContentProcessor] Processing ${documentType}`);
-  console.log(`[ContentProcessor] Input length: ${content.length} chars`);
-  
-  let processed = content;
-  
-  // ✅ FIX: Clean up any multi-line table cells
-  if (documentType === 'Lesson Concept Breakdown' || documentType === 'Schemes of Work') {
-    processed = cleanupTableCells(processed);
-  }
-  
-  // Remove any AI artifacts
-  processed = processed.replace(/```markdown\n?/g, '');
-  processed = processed.replace(/```\n?/g, '');
-  processed = processed.trim();
-  
-  console.log(`[ContentProcessor] Output length: ${processed.length} chars`);
-  
-  return processed;
-}
-
-/**
- * ✅ NEW: Clean up table cells that might have line breaks
- */
-function cleanupTableCells(content) {
-  const lines = content.split('\n');
-  const cleanedLines = [];
-  let inTable = false;
-  let currentRow = '';
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Detect table start
-    if (line.includes('|') && (line.includes('Term') || line.includes('WEEK'))) {
-      inTable = true;
-      cleanedLines.push(line);
-      continue;
-    }
-    
-    // Skip separator lines
-    if (line.match(/^\|[\s\-:]+\|$/)) {
-      cleanedLines.push(line);
-      continue;
-    }
-    
-    // Process table rows
-    if (inTable && line.includes('|')) {
-      const pipeCount = (line.match(/\|/g) || []).length;
-      
-      // If row has proper number of pipes, it's complete
-      if (pipeCount >= 5) { // Adjust based on expected columns
-        if (currentRow) {
-          cleanedLines.push(currentRow);
-          currentRow = '';
-        }
-        cleanedLines.push(line);
-      } else {
-        // Row is incomplete, accumulate it
-        currentRow += (currentRow ? ' ' : '') + line;
-      }
-    } else if (inTable && !line.includes('|') && line.length > 0) {
-      // Text without pipes inside table - append to current row
-      currentRow += ' ' + line;
-    } else {
-      // Not in table
-      if (currentRow) {
-        cleanedLines.push(currentRow);
-        currentRow = '';
-      }
-      cleanedLines.push(line);
-      if (!line.includes('|')) {
-        inTable = false;
-      }
-    }
-  }
-  
-  // Add any remaining row
-  if (currentRow) {
-    cleanedLines.push(currentRow);
-  }
-  
-  return cleanedLines.join('\n');
-}
-
-module.exports = {
-  postProcessGeneratedContent,
-  cleanupTableCells
-};
+module.exports = LessonPlanGenerator;
