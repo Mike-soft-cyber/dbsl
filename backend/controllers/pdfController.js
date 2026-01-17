@@ -560,15 +560,19 @@ function markdownToHtmlWithTables(markdown, baseUrl, documentType) {
   return html;
 }
 
-// Build PDF HTML
+// Build PDF HTML with LARGER TEXT
 function buildPDFHTML(doc, contentHtml, isWide) {
   const isLessonConcept = doc.type === 'Lesson Concept Breakdown';
   const isSchemesOfWork = doc.type === 'Schemes of Work';
-  const columnCount = isLessonConcept ? 5 : 10;
   const isWideFormat = isLessonConcept || isSchemesOfWork;
   
-  const baseFontSize = isLessonConcept ? '9pt' : (isWideFormat ? '8pt' : '10pt');
-  const tableFontSize = isLessonConcept ? '8pt' : (isWideFormat ? '6.5pt' : '8pt');
+  // ✅ INCREASED FONT SIZES for better readability
+  const baseFontSize = isLessonConcept ? '11pt' : (isWideFormat ? '10pt' : '12pt');
+  const tableFontSize = isLessonConcept ? '10pt' : (isWideFormat ? '8.5pt' : '10pt');
+  const headerFontSize = isWideFormat ? '20pt' : '22pt';
+  
+  // ✅ INCREASED CELL PADDING for better spacing
+  const cellPadding = isWideFormat ? '5px 6px' : '6px 8px';
   
   return `<!DOCTYPE html>
 <html>
@@ -579,105 +583,166 @@ function buildPDFHTML(doc, contentHtml, isWide) {
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: ${baseFontSize};
-      line-height: 1.4;
+      line-height: 1.5; /* Increased line height */
       color: #000;
       background: #fff;
-      padding: ${isWideFormat ? '10mm' : '15mm'};
-    }
-    .document-header {
-      border-bottom: 2px solid #000;
-      padding-bottom: 10px;
-      margin-bottom: 15px;
-      page-break-after: avoid;
-    }
-    .document-header h1 {
-      font-size: ${isWideFormat ? '16pt' : '18pt'};
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    .metadata { 
-      font-size: ${isWideFormat ? '7pt' : '8pt'}; 
-      color: #333; 
+      padding: ${isWideFormat ? '12mm' : '15mm'};
     }
     
+    .document-header {
+      border-bottom: 3px solid #000;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+      page-break-after: avoid;
+    }
+    
+    .document-header h1 {
+      font-size: ${headerFontSize};
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #1a237e;
+    }
+    
+    .metadata { 
+      font-size: ${isWideFormat ? '9pt' : '10pt'}; 
+      color: #333;
+      line-height: 1.4;
+    }
+    
+    .metadata strong {
+      color: #1a237e;
+    }
+    
+    /* ✅ ENHANCED TABLE STYLES */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0;
+      margin: 20px 0;
       font-size: ${tableFontSize};
       page-break-inside: auto;
       table-layout: fixed;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    
     .data-table th {
-      background-color: #2563eb !important;
+      background-color: #1a237e !important;
       color: white !important;
-      border: 1px solid #1e40af;
-      padding: ${isWideFormat ? '3px' : '4px'};
+      border: 2px solid #0d1459;
+      padding: ${cellPadding};
       text-align: center;
       font-weight: bold;
+      font-size: ${parseInt(tableFontSize) + 1}pt;
       page-break-after: avoid;
       page-break-inside: avoid;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      line-height: 1.4;
     }
+    
     .data-table td {
-      border: 1px solid #333;
-      padding: ${isWideFormat ? '3px' : '4px'};
+      border: 1px solid #666;
+      padding: ${cellPadding};
       vertical-align: top;
       word-wrap: break-word;
       overflow-wrap: break-word;
       page-break-inside: avoid;
       hyphens: auto;
+      line-height: 1.4;
     }
     
+    /* ✅ LESSON CONCEPT BREAKDOWN: 5-column layout with better widths */
     ${isLessonConcept ? `
     .data-table th:nth-child(1),
-    .data-table td:nth-child(1) { width: 12%; }
+    .data-table td:nth-child(1) { width: 10%; } /* Week */
     .data-table th:nth-child(2),
-    .data-table td:nth-child(2) { width: 10%; }
+    .data-table td:nth-child(2) { width: 15%; } /* Strand */
     .data-table th:nth-child(3),
-    .data-table td:nth-child(3) { width: 18%; }
+    .data-table td:nth-child(3) { width: 15%; } /* Sub-strand */
     .data-table th:nth-child(4),
-    .data-table td:nth-child(4) { width: 18%; }
+    .data-table td:nth-child(4) { width: 45%; } /* Learning Concept */
     .data-table th:nth-child(5),
-    .data-table td:nth-child(5) { width: 42%; }
+    .data-table td:nth-child(5) { width: 15%; } /* Reflection */
     ` : `
+    /* ✅ SCHEMES OF WORK: 10-column layout with better widths */
     .data-table th:nth-child(1),
-    .data-table td:nth-child(1) { width: 6%; }
+    .data-table td:nth-child(1) { width: 7%; }  /* Week */
     .data-table th:nth-child(2),
-    .data-table td:nth-child(2) { width: 6%; }
+    .data-table td:nth-child(2) { width: 7%; }  /* Lesson */
     .data-table th:nth-child(3),
-    .data-table td:nth-child(3) { width: 10%; }
+    .data-table td:nth-child(3) { width: 10%; } /* Strand */
     .data-table th:nth-child(4),
-    .data-table td:nth-child(4) { width: 10%; }
+    .data-table td:nth-child(4) { width: 12%; } /* Sub-strand */
     .data-table th:nth-child(5),
-    .data-table td:nth-child(5) { width: 18%; }
+    .data-table td:nth-child(5) { width: 20%; } /* SLO */
     .data-table th:nth-child(6),
-    .data-table td:nth-child(6) { width: 15%; }
+    .data-table td:nth-child(6) { width: 15%; } /* Learning Experiences */
     .data-table th:nth-child(7),
-    .data-table td:nth-child(7) { width: 12%; }
+    .data-table td:nth-child(7) { width: 12%; } /* KIQ */
     .data-table th:nth-child(8),
-    .data-table td:nth-child(8) { width: 9%; }
+    .data-table td:nth-child(8) { width: 8%; }  /* Resources */
     .data-table th:nth-child(9),
-    .data-table td:nth-child(9) { width: 7%; }
+    .data-table td:nth-child(9) { width: 6%; }  /* Assessment */
     .data-table th:nth-child(10),
-    .data-table td:nth-child(10) { width: 7%; }
+    .data-table td:nth-child(10) { width: 8%; } /* Reflection */
     `}
     
     .data-table tbody tr {
       page-break-inside: avoid;
       page-break-after: auto;
     }
+    
     .data-table tbody tr:nth-child(even) { 
-      background-color: #f5f5f5 !important;
+      background-color: #f8f9fa !important;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     
+    .data-table tbody tr:hover {
+      background-color: #e8f4fd !important;
+    }
+    
+    /* ✅ Content styling */
+    .content {
+      font-size: ${baseFontSize};
+      line-height: 1.6;
+    }
+    
+    .content h1 {
+      font-size: ${parseInt(baseFontSize) + 4}pt;
+      margin: 20px 0 10px 0;
+      color: #1a237e;
+    }
+    
+    .content h2 {
+      font-size: ${parseInt(baseFontSize) + 2}pt;
+      margin: 18px 0 8px 0;
+      color: #283593;
+    }
+    
+    .content h3 {
+      font-size: ${parseInt(baseFontSize) + 1}pt;
+      margin: 16px 0 6px 0;
+      color: #3949ab;
+    }
+    
+    .content p {
+      margin-bottom: 12px;
+      text-align: justify;
+    }
+    
+    .content ul, .content ol {
+      margin-left: 24px;
+      margin-bottom: 12px;
+    }
+    
+    .content li {
+      margin-bottom: 6px;
+    }
+    
     @page { 
-      margin: 10mm; 
+      margin: 15mm; /* Increased margins */
       size: ${isWideFormat ? 'A3 landscape' : 'A4 portrait'}; 
     }
     
@@ -685,15 +750,39 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       body {
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
+        font-size: ${parseInt(baseFontSize) + 1}pt; /* Slightly larger for print */
       }
-      .data-table thead {
-        display: table-header-group;
+      
+      .document-header {
+        margin-bottom: 25px;
       }
-      .data-table tbody {
-        display: table-row-group;
+      
+      .data-table {
+        font-size: ${parseInt(tableFontSize) + 1}pt; /* Larger for print */
       }
-      .data-table tr {
-        page-break-inside: avoid;
+      
+      .data-table th {
+        font-size: ${parseInt(tableFontSize) + 2}pt; /* Larger headers for print */
+      }
+      
+      .data-table td {
+        padding: 8px 10px; /* More padding for print */
+      }
+      
+      .no-print {
+        display: none !important;
+      }
+    }
+    
+    /* ✅ Print optimization */
+    @media print and (color) {
+      .data-table th {
+        background-color: #1a237e !important;
+        color: white !important;
+      }
+      
+      .data-table tbody tr:nth-child(even) {
+        background-color: #f8f9fa !important;
       }
     }
   </style>
@@ -707,9 +796,27 @@ function buildPDFHTML(doc, contentHtml, isWide) {
       <strong>Term:</strong> ${doc.term || 'N/A'}
       ${doc.strand ? `<br><strong>Strand:</strong> ${doc.strand}` : ''}
       ${doc.substrand ? ` | <strong>Sub-strand:</strong> ${doc.substrand}` : ''}
+      ${doc.school ? `<br><strong>School:</strong> ${doc.school}` : ''}
+      ${doc.createdAt ? `<br><strong>Generated:</strong> ${new Date(doc.createdAt).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })}` : ''}
     </div>
   </div>
   <div class="content">${contentHtml}</div>
+  
+  <!-- Footer for print -->
+  <div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 9pt; color: #666; text-align: center;">
+    <p>Generated by CBC Document Generator • Kenyan Competency Based Curriculum • ${doc.school || 'Educational Institution'}</p>
+    <p>Page generated on ${new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}</p>
+  </div>
 </body>
 </html>`;
 }
@@ -817,13 +924,20 @@ exports.generatePDF = async (req, res) => {
     tempFilePath = path.join(tempDir, `pdf-${Date.now()}.pdf`);
     
     console.log('[PDF] Generating PDF...');
-    await page.pdf({
-      path: tempFilePath,
-      format: isWide ? 'A3' : 'A4',
-      landscape: isWide,
-      printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
-    });
+await page.pdf({
+  path: tempFilePath,
+  format: isWide ? 'A3' : 'A4',
+  landscape: isWide,
+  printBackground: true,
+  margin: { 
+    top: '15mm', 
+    right: '15mm', 
+    bottom: '20mm',
+    left: '15mm' 
+  },
+  scale: 0.95,
+  preferCSSPageSize: true
+});
     console.log('[PDF] ✅ PDF created');
 
     await browser.close();
