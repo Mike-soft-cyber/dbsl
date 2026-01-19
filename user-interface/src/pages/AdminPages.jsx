@@ -46,6 +46,7 @@ export default function AdminPages() {
   const [schoolLogo, setSchoolLogo] = useState(null);
   const [schoolName, setSchoolName] = useState("EduAdmin");
   const [isMobile, setIsMobile] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const menuItems = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/adminPages/adminDash" },
@@ -67,6 +68,25 @@ export default function AdminPages() {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Handle scroll detection
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+
+    if (isMobile) {
+      window.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [isMobile]);
 
   // Fetch school logo and details
   useEffect(() => {
@@ -192,44 +212,65 @@ export default function AdminPages() {
           <Navbar userData={userData} />
           
           <div className="flex flex-1">
-            {/* Mobile-only compact sidebar toggle */}
-            {isMobile && (
-              <div className="md:hidden fixed top-16 left-0 right-0 bg-white border-b border-gray-200 z-40">
-                <div className="flex overflow-x-auto px-2 py-1">
-                  {menuItems.map(({ label, icon: Icon, path }) => (
-                    <button
-                      key={label}
-                      onClick={() => handleNavigation(path)}
-                      className={`flex flex-col items-center p-2 min-w-[70px] flex-shrink-0 ${
-                        isActive(path)
-                          ? 'text-teal-600 bg-teal-50'
-                          : 'text-gray-600 hover:text-teal-600'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 mb-1" />
-                      <span className="text-xs font-medium truncate">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <main className={`flex-1 overflow-auto bg-gray-50 ${
-              isMobile ? 'mt-16' : ''
-            }`}>
-              {/* Adjust padding based on mobile header */}
-              <div className={`${isMobile ? 'pt-2' : 'p-4 md:p-6'}`}>
+            <main className="flex-1 overflow-auto bg-gray-50">
+              {/* Add padding to account for bottom navigation on mobile */}
+              <div className={`${isMobile ? 'pb-24 pt-4 px-4' : 'p-4 md:p-6'} min-h-[calc(100vh-64px)]`}>
                 <Outlet />
               </div>
             </main>
           </div>
 
-          {/* Mobile Sidebar Menu (Additional options) */}
+          {/* Mobile Bottom Navigation - FIXED AT BOTTOM */}
+          {isMobile && (
+            <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
+              isScrolled ? 'shadow-[0_-4px_20px_rgba(0,0,0,0.1)]' : ''
+            }`}>
+              {/* Bottom navigation container */}
+              <div className="bg-white border-t border-gray-200 relative">
+                {/* Mobile navigation menu */}
+                <div className="flex items-center justify-between px-2 py-1">
+                  {menuItems.map(({ label, icon: Icon, path }) => (
+                    <button
+                      key={label}
+                      onClick={() => handleNavigation(path)}
+                      className={`flex flex-col items-center p-2 flex-1 min-w-0 ${
+                        isActive(path)
+                          ? 'text-teal-600'
+                          : 'text-gray-600 hover:text-teal-600'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg mb-1 ${
+                        isActive(path)
+                          ? 'bg-teal-50'
+                          : 'bg-gray-50 hover:bg-teal-50'
+                      }`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-medium truncate w-full text-center">{label}</span>
+                    </button>
+                  ))}
+                  
+                  {/* More/Menu button for additional options */}
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="flex flex-col items-center p-2 flex-1 min-w-0 text-gray-600 hover:text-teal-600"
+                  >
+                    <div className="p-2 rounded-lg mb-1 bg-gray-50 hover:bg-teal-50">
+                      <MoreVertical className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-medium truncate w-full text-center">More</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Sidebar Menu (Slide-up) - Only for "More" options */}
           {isMobile && isSidebarOpen && (
             <div className="md:hidden fixed inset-0 z-50">
               {/* Backdrop */}
               <div 
-                className="absolute inset-0 bg-black/50"
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={() => setIsSidebarOpen(false)}
               />
               

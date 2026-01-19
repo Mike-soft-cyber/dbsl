@@ -27,6 +27,7 @@ export default function AdminTeachers() {
     const [schoolCode, setSchoolCode] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('all');
+    const [error, setError] = useState(null);
 
     // Load user and school code
     useEffect(() => {
@@ -45,13 +46,16 @@ export default function AdminTeachers() {
         
         if (userData.schoolCode) {
             schoolCodeValue = userData.schoolCode;
+            console.log("Using school code from user data:", schoolCodeValue);
         } else if (localStorage.getItem('schoolCode')) {
             schoolCodeValue = localStorage.getItem('schoolCode');
+            console.log("Using school code from localStorage:", schoolCodeValue);
         } else {
             const enteredSchoolCode = prompt('Please enter your school code:');
             if (enteredSchoolCode) {
                 schoolCodeValue = enteredSchoolCode;
                 localStorage.setItem('schoolCode', enteredSchoolCode);
+                console.log("Using school code from prompt:", schoolCodeValue);
             } else {
                 toast.error('School code is required');
                 setLoading(false);
@@ -65,30 +69,65 @@ export default function AdminTeachers() {
 
     const fetchData = async (schoolCode) => {
         setLoading(true);
+        setError(null);
         try {
+            console.log("Fetching data for school code:", schoolCode);
+            
+            // Fetch teachers
             const teachersRes = await API.get(`/teachers/school/${schoolCode}`);
+            console.log("Teachers response:", teachersRes.data);
             setTeachers(teachersRes.data);
 
             const roleMap = {};
             teachersRes.data.forEach(t => roleMap[t._id] = t.role === "Admin");
             setRoleStates(roleMap);
 
-            const streamsRes = await API.get(`/school-config/${schoolCode}/streams`);
-            setStreams(streamsRes.data.streams || []);
+            // Try different endpoints for streams
+            try {
+                // First try the school-config streams endpoint
+                const streamsRes = await API.get(`/school-config/${schoolCode}/streams`);
+                console.log("Streams response:", streamsRes.data);
+                if (streamsRes.data && streamsRes.data.streams) {
+                    setStreams(streamsRes.data.streams || []);
+                }
+            } catch (streamsError) {
+                console.log("Could not fetch streams from school-config, trying alternative...");
+                
+                // Try getting streams from school config endpoint
+                try {
+                    const schoolConfigRes = await API.get(`/school-config/${schoolCode}`);
+                    console.log("School config response:", schoolConfigRes.data);
+                    if (schoolConfigRes.data && schoolConfigRes.data.school && schoolConfigRes.data.school.streams) {
+                        setStreams(schoolConfigRes.data.school.streams || []);
+                    } else {
+                        // If no streams found, use default streams
+                        setStreams(['Stream A', 'Stream B', 'Stream C']);
+                    }
+                } catch (configError) {
+                    console.log("Could not fetch school config, using default streams");
+                    setStreams(['Stream A', 'Stream B', 'Stream C']);
+                }
+            }
 
+            // Fetch grades and CBC entries
             const [gradesRes, cbcRes] = await Promise.all([
                 API.get('/documents/grades'),
                 API.get('/cbc')
             ]);
             setGrades(gradesRes.data);
             setCbcEntries(cbcRes.data);
+            console.log("Data loaded successfully");
 
         } catch (err) {
-            console.error(err);
+            console.error("Error fetching data:", err);
+            setError(err.response?.data?.message || err.message || 'Failed to load data');
+            
             if (err.response?.status === 404) {
                 toast.error('School not found. Please check your school code.');
+            } else if (err.response?.status === 401) {
+                toast.error('Session expired. Please login again.');
             } else {
-                toast.error('Failed to load data');
+                toast.error('Failed to load data. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -119,7 +158,7 @@ export default function AdminTeachers() {
     // Assign class
     const handleAssign = async () => {
         try {
-            setLoading(true)
+            setLoading(true);
             await API.post(`/teachers/${assigningTeacher._id}/class`, formData);
             const res = await API.get(`/teachers/school/${schoolCode}`);
             setTeachers(res.data);
@@ -129,15 +168,15 @@ export default function AdminTeachers() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to assign class");
-        }finally{
-            setLoading(false)
+        } finally {
+            setLoading(false);
         }
     };
 
     // Remove class
     const handleRemoveClass = async (assignment) => {
         try {
-            setLoading(true)
+            setLoading(true);
             await API.delete(`/teachers/${removingTeacher._id}/class`, { data: assignment });
             const res = await API.get(`/teachers/school/${schoolCode}`);
             setTeachers(res.data);
@@ -147,8 +186,8 @@ export default function AdminTeachers() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to remove class");
-        }finally{
-            setLoading(false)
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -182,7 +221,13 @@ export default function AdminTeachers() {
         }
     };
 
-    if (loading) {
+    const refreshData = () => {
+        if (schoolCode) {
+            fetchData(schoolCode);
+        }
+    };
+
+    if (loading && !schoolCode) {
         return (
             <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
                 <div className="text-center">
@@ -193,13 +238,13 @@ export default function AdminTeachers() {
         );
     }
 
-    if (!schoolCode) {
+    if (error && !schoolCode) {
         return (
             <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-                <div className="text-center">
-                    <School className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <div className="text-center max-w-md">
+                    <School className="h-16 w-16 text-red-500 mx-auto mb-4" />
                     <h2 className="text-xl font-semibold text-gray-800 mb-2">School Code Required</h2>
-                    <p className="text-gray-600 mb-4">Please provide your school code to continue</p>
+                    <p className="text-gray-600 mb-4">{error}</p>
                     <Button onClick={() => {
                         const enteredSchoolCode = prompt('Please enter your school code:');
                         if (enteredSchoolCode) {
@@ -223,7 +268,22 @@ export default function AdminTeachers() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 mb-2">👨‍🏫 Teachers Management</h1>
-                            <p className="text-gray-600">Manage teachers and their class assignments for {schoolCode}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-gray-600">Manage teachers for</p>
+                                <Badge variant="secondary" className="font-mono">
+                                    {schoolCode}
+                                </Badge>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={refreshData}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </Button>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="text-sm">
@@ -232,6 +292,30 @@ export default function AdminTeachers() {
                         </div>
                     </div>
                 </div>
+
+                {/* Error Alert */}
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="h-5 w-5 text-red-500">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <p className="text-red-700">{error}</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={refreshData}
+                                className="text-red-700 hover:bg-red-100"
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Filters Section */}
                 <Card className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
@@ -273,7 +357,12 @@ export default function AdminTeachers() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                        {filteredTeachers.length === 0 ? (
+                        {loading ? (
+                            <div className="text-center py-12">
+                                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+                                <p className="text-gray-600">Loading teachers...</p>
+                            </div>
+                        ) : filteredTeachers.length === 0 ? (
                             <div className="text-center py-12 text-gray-500">
                                 <Users className="h-16 w-16 mx-auto text-gray-300 mb-4" />
                                 <p className="text-lg font-medium text-gray-600 mb-2">No teachers found</p>
@@ -329,7 +418,7 @@ export default function AdminTeachers() {
                                                                 <div key={idx} className="flex items-center gap-2">
                                                                     <div className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0"></div>
                                                                     <span className="text-sm text-gray-700">
-                                                                        {cls.grade} • {cls.stream} • {cls.learningArea}
+                                                                        {cls.grade} • {cls.stream || 'No stream'} • {cls.learningArea}
                                                                     </span>
                                                                 </div>
                                                             ))}
@@ -438,11 +527,17 @@ export default function AdminTeachers() {
                                         <SelectValue placeholder="Select stream" />
                                     </SelectTrigger>
                                     <SelectContent className="bg-white border border-gray-200 rounded-lg shadow-lg">
-                                        {streams.map(s => (
-                                            <SelectItem key={s} value={s} className="focus:bg-blue-50">
-                                                {s}
+                                        {streams.length > 0 ? (
+                                            streams.map(s => (
+                                                <SelectItem key={s} value={s} className="focus:bg-blue-50">
+                                                    {s}
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="Stream A" className="focus:bg-blue-50">
+                                                Stream A
                                             </SelectItem>
-                                        ))}
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -533,7 +628,7 @@ export default function AdminTeachers() {
                                     <SelectContent className="bg-white border border-gray-200 rounded-lg shadow-lg">
                                         {removingTeacher?.assignedClasses.map((cls, idx) => (
                                             <SelectItem key={idx} value={JSON.stringify(cls)} className="focus:bg-orange-50">
-                                                {cls.grade} • {cls.stream} • {cls.learningArea}
+                                                {cls.grade} • {cls.stream || 'No stream'} • {cls.learningArea}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
