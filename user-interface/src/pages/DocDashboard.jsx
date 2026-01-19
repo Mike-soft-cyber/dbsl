@@ -1,44 +1,81 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, Download, FileText, Search, Calendar, Filter, Info, ExternalLink } from "lucide-react";
+import { Trash2, Download, FileText, Search, Calendar, Filter, ExternalLink, School } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import API from "@/api";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DocDashboard() {
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [downloadingIds, setDownloadingIds] = useState(new Set());
+    const [schoolCode, setSchoolCode] = useState("");
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        const fetchDocuments = async () => {
-            try {
-                const response = await API.get('/document-purchases');
-                console.log("Fetched documents:", response.data);
-                setDocuments(response.data);
-            } catch (error) {
-                console.error("Error fetching documents:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDocuments();
+        // Get school code from user data
+        const userData = JSON.parse(localStorage.getItem('userData'));
+        
+        if (!userData) {
+            toast.error('Please login again');
+            setLoading(false);
+            return;
+        }
+        
+        const userSchoolCode = userData.schoolCode || localStorage.getItem('schoolCode');
+        
+        if (!userSchoolCode) {
+            setError("School code not found. Please set your school code first.");
+            setLoading(false);
+            return;
+        }
+        
+        setSchoolCode(userSchoolCode);
+        fetchDocuments(userSchoolCode);
     }, []);
 
-    const handleDelete = async (id) => {
+    const fetchDocuments = async (schoolCode) => {
+        setLoading(true);
+        setError(null);
         try {
-            await API.delete(`/document-purchases/${id}`);
-            setDocuments(documents.filter(doc => doc._id !== id));
+            const response = await API.get(`/document-purchases?schoolCode=${schoolCode}`);
+            console.log(`Fetched documents for school ${schoolCode}:`, response.data);
+            setDocuments(response.data);
         } catch (error) {
-            console.error("Error deleting document:", error);
+            console.error("Error fetching documents:", error);
+            setError("Failed to fetch documents. Please try again.");
+            if (error.response?.status === 400) {
+                toast.error("School code is required");
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Updated download function that opens the actual document
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+            return;
+        }
+        
+        try {
+            await API.delete(`/document-purchases/${id}?schoolCode=${schoolCode}`);
+            setDocuments(documents.filter(doc => doc._id !== id));
+            toast.success("Document deleted successfully");
+        } catch (error) {
+            console.error("Error deleting document:", error);
+            if (error.response?.status === 403) {
+                toast.error("Unauthorized: You can only delete documents from your school");
+            } else {
+                toast.error("Failed to delete document");
+            }
+        }
+    };
+
     const handleDownload = (doc) => {
         if (!doc._id) {
             alert("Document ID not found. Cannot download.");
@@ -50,12 +87,10 @@ export default function DocDashboard() {
         window.open(documentUrl, '_blank');
     };
 
-    // Alternative: Direct download of the actual document content
     const handleDirectDownload = async (doc) => {
         setDownloadingIds(prev => new Set(prev).add(doc._id));
         
         try {
-            // Fetch the actual document content from your document endpoint
             const response = await API.get(`/documents/${doc._id}`);
             const documentData = response.data.document || response.data;
             
@@ -75,10 +110,11 @@ export default function DocDashboard() {
             link.click();
             
             URL.revokeObjectURL(url);
+            toast.success("Document downloaded successfully");
             
         } catch (error) {
             console.error("Error downloading document:", error);
-            alert("Failed to download document. Please try again.");
+            toast.error("Failed to download document. Please try again.");
         } finally {
             setDownloadingIds(prev => {
                 const newSet = new Set(prev);
@@ -88,7 +124,6 @@ export default function DocDashboard() {
         }
     };
 
-    // Extract substrands from content as a fallback
     const extractSubstrandsFromContent = (content) => {
         if (!content) return [];
         
@@ -115,7 +150,6 @@ export default function DocDashboard() {
         }
     };
 
-    // Helper function to normalize substrands (handle both string and array)
     const normalizeSubstrands = (substrands) => {
         if (!substrands) return [];
         
@@ -130,9 +164,7 @@ export default function DocDashboard() {
         return [];
     };
 
-    // Helper function to get substrands from document
     const getSubstrands = (doc) => {
-        // First try the substrands field (could be string or array)
         if (doc.substrands) {
             const normalized = normalizeSubstrands(doc.substrands);
             if (normalized.length > 0) {
@@ -140,15 +172,12 @@ export default function DocDashboard() {
             }
         }
         
-        // Then try to extract from content
         return extractSubstrandsFromContent(doc.content);
     };
 
-    // Filter documents based on search term
     const filteredDocuments = documents.filter(doc => {
         if (!doc) return false;
         
-        // Get substrands for search
         const docSubstrands = getSubstrands(doc);
         
         const searchableText = [
@@ -163,7 +192,6 @@ export default function DocDashboard() {
         return searchableText.includes(searchTerm.toLowerCase());
     });
 
-    // Helper function to safely handle substrands display
     const renderSubstrands = (doc) => {
         const substrands = getSubstrands(doc);
         
@@ -188,8 +216,11 @@ export default function DocDashboard() {
         );
     };
 
-    // Helper function to render status badge - REMOVED since status is not needed
-    // const renderStatusBadge = (status) => { ... }
+    const refreshData = () => {
+        if (schoolCode) {
+            fetchDocuments(schoolCode);
+        }
+    };
 
     if (loading) {
         return (
@@ -202,13 +233,83 @@ export default function DocDashboard() {
         );
     }
 
+    if (error && !schoolCode) {
+        return (
+            <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+                <div className="text-center max-w-md">
+                    <School className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-gray-800 mb-2">School Code Required</h2>
+                    <p className="text-gray-600 mb-4">{error}</p>
+                    <Button onClick={() => {
+                        const enteredSchoolCode = prompt('Please enter your school code:');
+                        if (enteredSchoolCode) {
+                            localStorage.setItem('schoolCode', enteredSchoolCode);
+                            setSchoolCode(enteredSchoolCode);
+                            fetchDocuments(enteredSchoolCode);
+                        }
+                    }}>
+                        Enter School Code
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-gray-800">📄 Document Creations</h1>
-                    <p className="text-gray-600 mt-1">Manage and track all documents made by teachers</p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-800">📄 Document Creations</h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-gray-600">Manage documents for</p>
+                                <Badge variant="secondary" className="font-mono">
+                                    {schoolCode}
+                                </Badge>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={refreshData}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-sm">
+                                {filteredDocuments.length} {filteredDocuments.length === 1 ? 'Document' : 'Documents'}
+                            </Badge>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Error Alert */}
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="h-5 w-5 text-red-500">
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <p className="text-red-700">{error}</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={refreshData}
+                                className="text-red-700 hover:bg-red-100"
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 <Card className="bg-white rounded-xl shadow-md overflow-hidden border-0">
                     <CardHeader className="bg-gradient-to-r from-blue-50 to-teal-50 p-6">
@@ -244,7 +345,6 @@ export default function DocDashboard() {
                                             <TableHead className="font-semibold text-gray-700 py-4">Strand</TableHead>
                                             <TableHead className="font-semibold text-gray-700 py-4">Substrands</TableHead>
                                             <TableHead className="font-semibold text-gray-700 py-4">Date</TableHead>
-
                                             <TableHead className="font-semibold text-gray-700 py-4 text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -282,7 +382,6 @@ export default function DocDashboard() {
                                                         </span>
                                                     </div>
                                                 </TableCell>
-
                                                 <TableCell className="py-4">
                                                     <div className="flex justify-end gap-2">
                                                         <Button 
@@ -291,16 +390,8 @@ export default function DocDashboard() {
                                                             onClick={() => handleDelete(doc._id)}
                                                             className="border-red-200 text-red-700 hover:bg-red-50 flex items-center gap-1"
                                                         >
-                                                            {loading ? (
-                                                                <>
-                                                                <Loader2 />
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                <Trash2 className="h-4 w-4" />
-                                                                Delete
-                                                                </>
-                                                            )}
+                                                            <Trash2 className="h-4 w-4" />
+                                                            Delete
                                                         </Button>
                                                         <Button 
                                                             variant="outline" 
@@ -332,7 +423,7 @@ export default function DocDashboard() {
                         ) : (
                             <div className="text-center py-12">
                                 <FileText className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                                <p className="text-gray-500">No document purchases found</p>
+                                <p className="text-gray-500">No documents found for school {schoolCode}</p>
                                 {searchTerm && (
                                     <p className="text-sm text-gray-400 mt-1">
                                         No results for "{searchTerm}". Try a different search term.

@@ -1,17 +1,45 @@
 const Document = require('../models/Document');
+const User = require('../models/User');
 
 exports.getAllTeacherPurchases = async (req, res) => {
   try {
-    console.log('[DocDashboard] Fetching all documents...');
+    console.log('[DocDashboard] Fetching documents for school...');
     
-    // Fetch all documents with populated teacher and cbcEntry
-    const documents = await Document.find()
-      .populate('teacher', 'firstName lastName')       
+    // Get the school code from query params or from user's school
+    const { schoolCode } = req.query;
+    
+    if (!schoolCode) {
+      return res.status(400).json({ 
+        message: 'School code is required' 
+      });
+    }
+    
+    console.log(`[DocDashboard] Fetching documents for school: ${schoolCode}`);
+    
+    // First, get all teachers in this school
+    const teachersInSchool = await User.find({ 
+      schoolCode: schoolCode,
+      role: { $in: ['Teacher', 'Admin'] }
+    }).select('_id');
+    
+    const teacherIds = teachersInSchool.map(teacher => teacher._id);
+    
+    console.log(`[DocDashboard] Found ${teacherIds.length} teachers in school ${schoolCode}`);
+    
+    if (teacherIds.length === 0) {
+      return res.status(200).json([]);
+    }
+    
+    // Fetch documents created by teachers in this school
+    const documents = await Document.find({
+      teacher: { $in: teacherIds }
+    })
+      .populate('teacher', 'firstName lastName schoolCode')       
       .populate('cbcEntry', 'grade learningArea strand substrand')
-      .sort({ createdAt: -1 }) // Most recent first
-      .lean(); // Use lean() for better performance
+      .sort({ createdAt: -1 })
+      .lean();
 
-    console.log(`[DocDashboard] Found ${documents.length} documents`);
+    console.log(`[DocDashboard] Found ${documents.length} documents in school ${schoolCode}`);
 
     // Map documents to the format expected by frontend
     const result = documents.map(doc => {
@@ -35,9 +63,10 @@ exports.getAllTeacherPurchases = async (req, res) => {
         strand: strand,
         substrands: substrand ? [substrand] : [],
         date: doc.createdAt,
-        status: doc.status || 'completed', // Use document status
-        content: doc.content || '', // Include content for frontend extraction
-        term: doc.term || 'N/A'
+        status: doc.status || 'completed',
+        content: doc.content || '',
+        term: doc.term || 'N/A',
+        schoolCode: doc.teacher?.schoolCode || schoolCode // Include school code
       };
     });
 
@@ -55,13 +84,24 @@ exports.getAllTeacherPurchases = async (req, res) => {
 
 exports.deleteDocumentPurchase = async (req, res) => {
   const { id } = req.params;
+  const { schoolCode } = req.query; // Optional: verify document belongs to school
 
   try {
-    console.log(`[DocDashboard] Deleting document: ${id}`);
+    console.log(`[DocDashboard] Deleting document: ${id} for school: ${schoolCode || 'not specified'}`);
     
-    const document = await Document.findByIdAndDelete(id);
+    // Optional: Verify the document belongs to the school
+    if (schoolCode) {
+      const document = await Document.findById(id).populate('teacher', 'schoolCode');
+      if (document && document.teacher && document.teacher.schoolCode !== schoolCode) {
+        return res.status(403).json({ 
+          message: 'Unauthorized: Document does not belong to your school' 
+        });
+      }
+    }
     
-    if (!document) {
+    const deletedDocument = await Document.findByIdAndDelete(id);
+    
+    if (!deletedDocument) {
       console.log(`[DocDashboard] Document ${id} not found`);
       return res.status(404).json({ message: 'Document not found' });
     }
