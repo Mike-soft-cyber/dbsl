@@ -1,7 +1,7 @@
 import React from 'react';
 
 const TableView = ({ data, strand, substrand, cbcEntry }) => {
-  if (!data || !data.headers || !data.rows || data.rows.length === 0) {
+   if (!data || !data.headers || !data.rows || data.rows.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         No table data available
@@ -207,10 +207,12 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
 
     if (data.headers.some(h => h.toLowerCase().includes('learning concept'))) {
     console.log('[TableView] ✅ Lesson Concept Breakdown detected');
+    console.log('[TableView] Current headers:', data.headers);
+    console.log('[TableView] Current columns:', data.headers.length);
     
-    const standardHeaders = ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'];
+    const standardHeaders = ['TERM', 'WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT'];
     
-
+    // Only fix if headers don't match
     if (data.headers.length !== 5 || !arraysEqual(data.headers.map(h => h.toUpperCase()), standardHeaders)) {
       console.log('[TableView] ⚠️ Fixing columns for Lesson Concept Breakdown');
       
@@ -219,16 +221,26 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       fixedData.rows = data.rows.map(row => {
         const newRow = [...row];
         
-        while (newRow.length < 4) newRow.push('');
-        
-        if (newRow.length === 4) {
-          newRow.push('Were learners able to meet the learning objectives?');
+        // If row has fewer than 5 columns, pad with empty strings
+        while (newRow.length < 5) {
+          newRow.push('');
         }
         
-        if (newRow.length > 5) newRow.length = 5;
+        // If first column is not a term, add default term
+        if (newRow[0] && !newRow[0].toLowerCase().includes('term')) {
+          newRow.unshift('Term 1'); // Add term at beginning
+        }
+        
+        // Ensure exactly 5 columns
+        if (newRow.length > 5) {
+          newRow.length = 5;
+        }
         
         return newRow;
       });
+      
+      console.log('[TableView] ✅ Fixed to 5 columns:', fixedData.headers);
+      console.log('[TableView] Sample row:', fixedData.rows[0]);
     }
   }
   }
@@ -308,6 +320,12 @@ const getColumnWidth = (header, index) => {
   if (!header) return '100px';
   
   const headerLower = header.toLowerCase();
+  
+  if (headerLower.includes('term') && !headerLower.includes('determine')) {
+    return '80px'; // Term column width
+  } else if (headerLower.includes('week')) {
+    return '70px';
+  }
   
   if (headerLower.includes('week')) {
     return '70px';

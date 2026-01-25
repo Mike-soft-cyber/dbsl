@@ -25,41 +25,36 @@ const GenerateLessonPlanButton = ({ document }) => {
   if (document?.content) {
     console.log('[useEffect] Starting concept extraction...');
     
-    // Use the ContentParser to parse the table
     const parsed = ContentParser.parse(document.content, 'Lesson Concept Breakdown');
     
     console.log('[useEffect] Parsed table structure:');
     console.log('Headers:', parsed.data?.headers);
+    console.log('Header count:', parsed.data?.headers?.length);
     console.log('First row:', parsed.data?.rows?.[0]);
-    console.log('Second row:', parsed.data?.rows?.[1]);
     
     if (parsed.type === 'table' && parsed.data?.rows?.length > 0) {
       console.log('[useEffect] ContentParser found table with', parsed.data.rows.length, 'rows');
       
-      // Extract concepts from parsed table
       const extractedConcepts = [];
       parsed.data.rows.forEach((row, index) => {
-        // Row format depends on the table structure
-        // Try to find week and concept in different positions
+        let term = '';
         let week = '';
         let concept = '';
         
-        // Row could be [Term, Week, Strand, Sub-strand, Learning Concept]
-        // Or different format if generic parser reorganized it
-        
-        // Try different indices
+        // CHANGED: Handle 5 columns [Term, Week, Strand, Sub-strand, Learning Concept]
         if (row.length >= 5) {
-          // Standard format
+          term = row[0];     // Term
           week = row[1];     // Week
           concept = row[4];  // Learning Concept
-        } else if (row.length >= 4) {
-          // Alternative format
-          week = row[0];     // Week  
-          concept = row[3];  // Learning Concept
-        } else if (row.length >= 2) {
-          // Minimal format
+        } else if (row.length === 4) {
+          // Fallback: [Week, Strand, Sub-strand, Learning Concept]
           week = row[0];     // Week
-          concept = row[1];  // Concept
+          concept = row[3];  // Learning Concept
+          term = 'Term 1';
+        } else if (row.length >= 2) {
+          week = row[0];
+          concept = row[1];
+          term = 'Term 1';
         }
         
         // Validate
@@ -68,6 +63,7 @@ const GenerateLessonPlanButton = ({ document }) => {
           const weekNumber = weekMatch ? parseInt(weekMatch[1]) : index + 1;
           
           extractedConcepts.push({
+            term: term || 'Term 1',
             week: `Week ${weekNumber}`,
             weekNumber: weekNumber,
             concept: concept.toString()
@@ -76,16 +72,11 @@ const GenerateLessonPlanButton = ({ document }) => {
       });
       
       console.log('[useEffect] Extracted from ContentParser:', extractedConcepts.length, 'concepts');
-      setConcepts(extractedConcepts);
-      
       if (extractedConcepts.length > 0) {
-        setTotalLessons(extractedConcepts.length);
-        console.log('[useEffect] ✅ Successfully extracted', extractedConcepts.length, 'concepts');
-      } else {
-        setExtractionError('Could not extract concepts from parsed table');
+        console.log('[useEffect] Sample concept:', extractedConcepts[0]);
       }
-    } else {
-      setExtractionError('ContentParser could not find a valid table');
+      setConcepts(extractedConcepts);
+      setTotalLessons(extractedConcepts.length);
     }
   }
 }, [document]);

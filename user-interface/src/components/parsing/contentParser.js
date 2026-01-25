@@ -41,7 +41,7 @@ class ContentParser {
 
   static parseLessonConceptTable(content) {
   const tableData = {
-    headers: ['Term', 'Week', 'Strand', 'Sub-strand', 'Learning Concept'],
+    headers: ['Term', 'Week', 'Strand', 'Sub-strand', 'Learning Concept'], // Keep Term
     rows: []
   };
   
@@ -77,17 +77,23 @@ class ContentParser {
     if (line.includes('|')) {
       const cells = line
         .split('|')
-        .map(cell => cell.trim())
-        .filter(cell => cell !== '');
+        .map(c => c.trim())
+        .filter(c => c !== '');
       
       console.log('[Parser] Row', rowNumber, '- Raw cells:', cells.length, '-', cells.map(c => c.substring(0, 15)));
       
-      if (cells.length >= 4 && cells.length <= 5) {
+      // CHANGED: Accept 5 columns for [Term, Week, Strand, Sub-strand, Learning Concept]
+      if (cells.length >= 4 && cells.length <= 6) {
         let term, week, strand, substrand, concept;
         
         if (cells.length === 5) {
+          // Perfect: [Term, Week, Strand, Sub-strand, Learning Concept]
           [term, week, strand, substrand, concept] = cells;
+        } else if (cells.length === 6) {
+          // Extra column (possibly empty first cell from |)
+          [, term, week, strand, substrand, concept] = cells;
         } else if (cells.length === 4) {
+          // Missing term: [Week, Strand, Sub-strand, Learning Concept]
           [week, strand, substrand, concept] = cells;
           term = 'Term 1'; // Default
         }
@@ -102,23 +108,23 @@ class ContentParser {
         if (isValidWeek && isValidConcept) {
           const row = [term || 'Term 1', week, strand || '', substrand || '', concept];
           tableData.rows.push(row);
-          console.log('[Parser] âœ… Added row', rowNumber, '- Week:', week);
+          console.log('[Parser] ✅ Added row', rowNumber, '- Term:', term, 'Week:', week);
           rowNumber++;
         } else {
-          console.log('[Parser] âš ï¸ Invalid row - Week valid?', isValidWeek, '| Concept valid?', isValidConcept);
+          console.log('[Parser] ⚠️ Invalid row - Week valid?', isValidWeek, '| Concept valid?', isValidConcept);
         }
       } else {
-        console.log('[Parser] âŒ Wrong column count:', cells.length, '(need 4-5)');
+        console.log('[Parser] ❌ Wrong column count:', cells.length, '(need 4-6)');
       }
     }
     
     if (tableData.rows.length >= 100) {
-      console.log('[Parser] âš ï¸ Reached 100 row limit, stopping');
+      console.log('[Parser] ⚠️ Reached 100 row limit, stopping');
       break;
     }
   }
   
-  console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows');
+  console.log('[Parser] Final: Extracted', tableData.rows.length, 'valid rows with Term column');
   return tableData.rows.length > 0 ? tableData : null;
 }
 
