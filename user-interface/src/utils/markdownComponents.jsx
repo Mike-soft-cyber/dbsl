@@ -1,8 +1,8 @@
-// ✅ markdownComponents.jsx – Enhanced for web references and thumbnail cards
+// markdownComponents.jsx – Enhanced for web references and thumbnail cards
 import React, { useState, useEffect } from "react";
 import { FileText, ExternalLink, Globe, Image as ImageIcon } from "lucide-react";
 
-// ✅ Professional Image Component (fallback for any remaining images)
+//Professional Image Component (fallback for any remaining images)
 export const ProfessionalImageComponent = ({
   src,
   alt,
@@ -25,7 +25,7 @@ export const ProfessionalImageComponent = ({
 
     let finalSrc = src || "";
     
-    // ✅ FIX: Use Vite environment variable for production
+    //Use Vite environment variable for production
     const API_BASE = import.meta.env.VITE_BACKEND_URL || 
                      import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 
                      'http://localhost:5000';
@@ -153,7 +153,7 @@ export const ProfessionalImageComponent = ({
   );
 };
 
-// ✅ Professional Markdown Render Components (Enhanced for Web References & Thumbnail Cards)
+// Professional Markdown Render Components (Enhanced for Web References & Thumbnail Cards)
 const professionalMarkdownComponents = {
   h1: ({ children, ...props }) => (
     <h1
@@ -172,7 +172,7 @@ const professionalMarkdownComponents = {
     </h2>
   ),
   h3: ({ children, node, ...props }) => {
-    // ✅ Special styling for web reference sections
+    // Special styling for web reference sections
     const text = children?.toString() || '';
     if (text.includes('📊 Visual Learning Resources')) {
       return (
@@ -202,7 +202,7 @@ const professionalMarkdownComponents = {
     </h4>
   ),
 
-  // ✅ ENHANCED: Support for HTML div elements (for thumbnail cards)
+  // Support for HTML div elements (for thumbnail cards)
   div: ({ node, className, children, style, ...props }) => {
     // Check if it's a reference card
     if (className === 'web-reference-card') {
@@ -232,7 +232,7 @@ const professionalMarkdownComponents = {
     return <div className={className} style={style} {...props}>{children}</div>;
   },
 
-  // ✅ ENHANCED: Paragraphs and images handling with reference support
+  // Paragraphs and images handling with reference support
   p: ({ node, children, className, ...props }) => {
     // Check if inside reference card
     if (className === 'reference-snippet') {
@@ -272,7 +272,7 @@ const professionalMarkdownComponents = {
     </li>
   ),
   strong: ({ children, ...props }) => {
-    // ✅ Special styling for reference labels
+    // Special styling for reference labels
     const text = children?.toString() || '';
     if (text.startsWith('Reference ') || text === 'Source:' || text === 'Description:' || text === 'Educational Use:' || text === 'License:') {
       return (
@@ -288,7 +288,7 @@ const professionalMarkdownComponents = {
     );
   },
   em: ({ children, ...props }) => {
-    // ✅ Special styling for reference notes
+    // Special styling for reference notes
     const text = children?.toString() || '';
     if (text.includes('external resources') || text.includes('verify content') || text.includes('External links provided')) {
       return (
@@ -364,7 +364,7 @@ const professionalMarkdownComponents = {
     ),
   hr: (props) => <hr className="my-8 border-t-2 border-gray-300" {...props} />,
 
-  // ✅ Enhanced link styling for external references
+  // Enhanced link styling for external references
   a: ({ node, href, children, ...props }) => {
     if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
       return (
@@ -392,7 +392,7 @@ const professionalMarkdownComponents = {
     );
   },
 
-  // ✅ ENHANCED: Better image handling for thumbnails
+  // ENHANCED: Better image handling for thumbnails
   img: ({ src, alt, className, style, loading, ...props }) => {
     // Reference thumbnail
     if (className === 'reference-thumbnail') {
@@ -449,7 +449,7 @@ const professionalMarkdownComponents = {
     );
   },
 
-  // ✅ ENHANCED: Small element handling for styled text
+  // Small element handling for styled text
   small: ({ children, style, ...props }) => {
     // Check if it's a color-styled small element
     if (style && typeof style === 'string' && style.includes('color')) {
@@ -471,7 +471,7 @@ const professionalMarkdownComponents = {
   },
 };
 
-// ✅ Exports (Vite HMR safe)
+// Exports (Vite HMR safe)
 export const getProfessionalMarkdownComponents = () =>
   professionalMarkdownComponents;
 export default professionalMarkdownComponents;

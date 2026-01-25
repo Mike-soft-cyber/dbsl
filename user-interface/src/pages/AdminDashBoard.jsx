@@ -19,14 +19,11 @@ export default function AdminDashboard() {
     const [userDownloads, setUserDownloads] = useState(0);
     const [userDocumentsCreated, setUserDocumentsCreated] = useState(0);
 
-    // ✅ MOVE fetchUserStats OUTSIDE useEffect so it's accessible everywhere
     const fetchUserStats = async () => {
         try {
-            // Fetch user's downloads count
             const downloadsRes = await API.get(`/teacher/${userData._id}/downloads/count`);
             setUserDownloads(downloadsRes.data.count || 0);
             
-            // Fetch user's documents created count
             const docsRes = await API.get(`/teacher/${userData._id}/documents/count`);
             setUserDocumentsCreated(docsRes.data.count || 0);
             
@@ -42,15 +39,13 @@ export default function AdminDashboard() {
             fetchUserStats();
         }
 
-        // ✅ NOW fetchUserStats is defined and accessible
         const handleDocumentDownloaded = () => {
             console.log('📥 Document downloaded event received, refreshing stats...');
-            fetchUserStats(); // This will work now
+            fetchUserStats();
         };
 
         window.addEventListener('documentDownloaded', handleDocumentDownloaded);
 
-        // Cleanup
         return () => {
             window.removeEventListener('documentDownloaded', handleDocumentDownloaded);
         };
@@ -141,11 +136,9 @@ export default function AdminDashboard() {
     useEffect(() => {
         const fetchUserStats = async () => {
             try {
-                // Fetch user's downloads count
                 const downloadsRes = await API.get(`/teacher/${userData._id}/downloads/count`);
                 setUserDownloads(downloadsRes.data.count || 0);
-                
-                // Fetch user's documents created count
+
                 const docsRes = await API.get(`/teacher/${userData._id}/documents/count`);
                 setUserDocumentsCreated(docsRes.data.count || 0);
                 

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const data = location.state; // ✅ Get data from location state
+  const data = location.state;
   const userData = JSON.parse(localStorage.getItem("userData"));
   const teacherId = localStorage.getItem("teacherId");
 
@@ -19,7 +19,7 @@ export default function Checkout() {
   const [showLessonSelector, setShowLessonSelector] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState(1);
 
-  // ✅ Handle missing data (redirect back if no data)
+  // Handle missing data (redirect back if no data)
   useEffect(() => {
     if (!data) {
       toast.error("No document data found");
@@ -183,7 +183,7 @@ export default function Checkout() {
       );
       
       if (res.data.success) {
-        alert(`✅ Lesson Plan generated for lesson ${selectedLesson}!`);
+        alert(` Lesson Plan generated for lesson ${selectedLesson}!`);
         window.location.href = `/documents/${res.data.document._id}`;
       }
     } catch (err) {

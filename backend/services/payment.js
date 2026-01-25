@@ -3,7 +3,7 @@ const axiosRetry = require('axios-retry').default;
 const dotenv = require('dotenv');
 dotenv.config();
 
-// Env variables
+
 const {
   MPESA_CONSUMER_KEY,
   MPESA_CONSUMER_SECRET,
@@ -23,11 +23,11 @@ axiosRetry(mpesaAxios, {
   },
 });
 
-// Cached token store
+
 let cachedToken = null;
 let tokenExpiry = null;
 
-// ✅ Get and cache access token
+
 const getAccessToken = async () => {
   if (cachedToken && tokenExpiry > Date.now()) {
     return cachedToken;
@@ -46,7 +46,7 @@ const getAccessToken = async () => {
     );
 
     cachedToken = response.data.access_token;
-    tokenExpiry = Date.now() + (response.data.expires_in - 60) * 1000; // cache ~59 mins
+    tokenExpiry = Date.now() + (response.data.expires_in - 60) * 1000; 
 
     console.log("✅ Token fetched successfully");
     return cachedToken;
@@ -56,7 +56,7 @@ const getAccessToken = async () => {
   }
 };
 
-// ✅ Initiate STK Push
+
 const stkPush = async (
   phoneNumber,
   amount,
@@ -104,7 +104,7 @@ const stkPush = async (
   }
 };
 
-// ✅ Query STK Push Status
+
 const queryStkPushStatus = async (checkoutRequestID) => {
   const accessToken = await getAccessToken();
 

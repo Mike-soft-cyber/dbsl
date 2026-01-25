@@ -1,4 +1,4 @@
-// backend/controllers/callbackController.js
+
 
 exports.handleCallback = (req, res) => {
   try {

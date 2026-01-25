@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 const path = require('path');
 
-// ✅ FIX: Load .env from backend folder
+
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const LevelConfig = require('../models/LevelConfig');
 const SubjectConfig = require('../models/SubjectConfig');
 
-// ✅ ADD: Verify environment variable
+
 console.log('🔍 Checking environment...');
 console.log('📍 Current directory:', __dirname);
 console.log('📍 .env path:', path.join(__dirname, '..', '..', '.env'));
@@ -79,7 +79,7 @@ const levelConfigs = [
 ];
 
 const subjectConfigs = [
-  // ========== PRE-SCHOOL ==========
+  
   { subject: 'PPI', level: 'PreSchool', grades: ['PP 1', 'PP 2'], lessonsPerWeek: 1 },
   { subject: 'Psychomotor and Creative Arts', level: 'PreSchool', grades: ['PP 1', 'PP 2'], lessonsPerWeek: 6 },
   { subject: 'CRE', level: 'PreSchool', grades: ['PP 1', 'PP 2'], lessonsPerWeek: 3 },
@@ -89,7 +89,7 @@ const subjectConfigs = [
   { subject: 'Language Activities', level: 'PreSchool', grades: ['PP 1', 'PP 2'], lessonsPerWeek: 5 },
   { subject: 'Mathematical Activities', level: 'PreSchool', grades: ['PP 1', 'PP 2'], lessonsPerWeek: 5 },
 
-  // ========== LOWER PRIMARY ==========
+  
   { subject: 'PPI', level: 'Lower Primary', grades: ['Grade 1', 'Grade 2', 'Grade 3'], lessonsPerWeek: 1 },
   { subject: 'Indigenous', level: 'Lower Primary', grades: ['Grade 1', 'Grade 2', 'Grade 3'], lessonsPerWeek: 2 },
   { subject: 'Creative Arts', level: 'Lower Primary', grades: ['Grade 1', 'Grade 2', 'Grade 3'], lessonsPerWeek: 7 },
@@ -99,7 +99,7 @@ const subjectConfigs = [
   { subject: 'English', level: 'Lower Primary', grades: ['Grade 1', 'Grade 2', 'Grade 3'], lessonsPerWeek: 5 },
   { subject: 'Mathematics', level: 'Lower Primary', grades: ['Grade 1', 'Grade 2', 'Grade 3'], lessonsPerWeek: 5 },
 
-  // ========== UPPER PRIMARY ==========
+  
   { subject: 'PPI', level: 'Upper Primary', grades: ['Grade 4', 'Grade 5', 'Grade 6'], lessonsPerWeek: 1 },
   { subject: 'Creative Arts', level: 'Upper Primary', grades: ['Grade 4', 'Grade 5', 'Grade 6'], lessonsPerWeek: 6 },
   { subject: 'CRE', level: 'Upper Primary', grades: ['Grade 4', 'Grade 5', 'Grade 6'], lessonsPerWeek: 3 },
@@ -110,7 +110,7 @@ const subjectConfigs = [
   { subject: 'English', level: 'Upper Primary', grades: ['Grade 4', 'Grade 5', 'Grade 6'], lessonsPerWeek: 5 },
   { subject: 'Mathematics', level: 'Upper Primary', grades: ['Grade 4', 'Grade 5', 'Grade 6'], lessonsPerWeek: 5 },
 
-  // ========== JUNIOR SCHOOL ==========
+  
   { subject: 'PPI', level: 'Junior School', grades: ['Grade 7', 'Grade 8', 'Grade 9'], lessonsPerWeek: 1 },
   { subject: 'Pre-technical', level: 'Junior School', grades: ['Grade 7', 'Grade 8', 'Grade 9'], lessonsPerWeek: 4 },
   { subject: 'Creative Arts & Sports', level: 'Junior School', grades: ['Grade 7', 'Grade 8', 'Grade 9'], lessonsPerWeek: 5 },
@@ -122,7 +122,7 @@ const subjectConfigs = [
   { subject: 'English', level: 'Junior School', grades: ['Grade 7', 'Grade 8', 'Grade 9'], lessonsPerWeek: 5 },
   { subject: 'Mathematics', level: 'Junior School', grades: ['Grade 7', 'Grade 8', 'Grade 9'], lessonsPerWeek: 5 },
 
-  // ========== SPECIAL NEEDS - FOUNDATION ==========
+  
   { subject: 'Communication and Social Skills', level: 'Special Needs - Foundation', grades: ['Foundation Level'], lessonsPerWeek: 4 },
   { subject: 'Activities of Daily Living Skills', level: 'Special Needs - Foundation', grades: ['Foundation Level'], lessonsPerWeek: 4 },
   { subject: 'Religious Education', level: 'Special Needs - Foundation', grades: ['Foundation Level'], lessonsPerWeek: 2 },
@@ -134,7 +134,7 @@ const subjectConfigs = [
   { subject: 'Pre-numeracy Activities', level: 'Special Needs - Foundation', grades: ['Foundation Level'], lessonsPerWeek: 2 },
   { subject: 'PPI', level: 'Special Needs - Foundation', grades: ['Foundation Level'], lessonsPerWeek: 1 },
 
-  // ========== SPECIAL NEEDS - INTERMEDIATE ==========
+  
   { subject: 'Communication and Social Skills', level: 'Special Needs - Intermediate', grades: ['Intermediate Level'], lessonsPerWeek: 5 },
   { subject: 'Daily Living Skills', level: 'Special Needs - Intermediate', grades: ['Intermediate Level'], lessonsPerWeek: 4 },
   { subject: 'Religious Education', level: 'Special Needs - Intermediate', grades: ['Intermediate Level'], lessonsPerWeek: 2 },
@@ -145,7 +145,7 @@ const subjectConfigs = [
   { subject: 'Movement Activities', level: 'Special Needs - Intermediate', grades: ['Intermediate Level'], lessonsPerWeek: 5 },
   { subject: 'PPI', level: 'Special Needs - Intermediate', grades: ['Intermediate Level'], lessonsPerWeek: 1 },
 
-  // ========== SPECIAL NEEDS - PRE-VOCATIONAL ==========
+  
   { subject: 'Prevocational Skills', level: 'Special Needs - Pre-vocational', grades: ['Pre-vocational Level'], lessonsPerWeek: 18 },
   { subject: 'Communication and Functional Literacy Skills', level: 'Special Needs - Pre-vocational', grades: ['Pre-vocational Level'], lessonsPerWeek: 4 },
   { subject: 'Daily Living Skills and Nutrition', level: 'Special Needs - Pre-vocational', grades: ['Pre-vocational Level'], lessonsPerWeek: 4 },
@@ -163,17 +163,17 @@ async function seedCurriculumData() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Connected to MongoDB');
 
-    // Clear existing data
+    
     const deletedLevels = await LevelConfig.deleteMany({});
     const deletedSubjects = await SubjectConfig.deleteMany({});
     console.log(`🗑️  Deleted ${deletedLevels.deletedCount} level configs`);
     console.log(`🗑️  Deleted ${deletedSubjects.deletedCount} subject configs`);
 
-    // Insert level configs
+    
     const insertedLevels = await LevelConfig.insertMany(levelConfigs);
     console.log(`✅ Inserted ${insertedLevels.length} level configurations`);
 
-    // Insert subject configs
+    
     const insertedSubjects = await SubjectConfig.insertMany(subjectConfigs);
     console.log(`✅ Inserted ${insertedSubjects.length} subject configurations`);
 

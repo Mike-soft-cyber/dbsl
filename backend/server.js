@@ -3,10 +3,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
-// ✅ CRITICAL: Load environment variables FIRST
+
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-// ✅ CRITICAL: Debug environment variables BEFORE passport
+
 console.log('🚀 Starting server initialization...');
 console.log('🔍 Environment check:');
 console.log('   NODE_ENV:', process.env.NODE_ENV);
@@ -14,7 +14,7 @@ console.log('   GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✓ Loaded' 
 console.log('   GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✓ Loaded' : '✗ MISSING');
 console.log('   BACKEND_URL:', process.env.BACKEND_URL || 'Not set');
 
-// ✅ Validate environment variables
+
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   console.error('❌ FATAL ERROR: Google OAuth credentials are missing!');
   console.error('   Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env file');
@@ -22,17 +22,17 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 const connectDB = require('./config/db');
-const passport = require('passport');  // Import passport first
+const passport = require('passport');  
 
-// Now initialize passport configuration
+
 console.log('🔐 Loading passport configuration...');
-require('./config/passport');  // This uses the now-loaded environment variables
+require('./config/passport');  
 console.log('✅ Passport config loaded successfully');
 
 const app = express();
 connectDB();
 
-// ✅ CORS configuration (same as yours)
+
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -59,7 +59,7 @@ app.use(cors({
   exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
-// Additional security headers
+
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -69,7 +69,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parsers
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(passport.initialize());
@@ -82,12 +82,12 @@ app.options('/api/diagrams/:filename', (req, res) => {
   res.sendStatus(204);
 });
 
-// ✅ CRITICAL: Diagram serving route BEFORE other routes
+
 app.get('/api/diagrams/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
     
-    // Security: prevent directory traversal
+    
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       console.error('[Diagrams] Invalid filename:', filename);
       return res.status(400).send('Invalid filename');

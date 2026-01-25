@@ -27,7 +27,7 @@ exports.getAllPayments = async (req, res) => {
   try {
     const { grade, status, startDate, endDate } = req.query;
 
-    // Build filter object
+    
     const filter = {};
 
     if (status) filter.status = status;
@@ -37,7 +37,7 @@ exports.getAllPayments = async (req, res) => {
       if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
-    // First, find all matching payments
+    
     const payments = await Payment.find(filter)
       .populate({
         path: "documentId",
@@ -48,7 +48,7 @@ exports.getAllPayments = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    // Then filter by grade if provided
+    
     const filtered = grade
       ? payments.filter(
           (p) => p.documentId?.cbcEntry?.grade?.toLowerCase() === grade.toLowerCase()

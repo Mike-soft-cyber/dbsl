@@ -59,12 +59,11 @@ function Login() {
         }
     };
 
-    // ✅ ADD: Google Login Handler
+    //Google Login Handler
     const handleGoogleLogin = () => {
-        // Redirect to backend Google OAuth endpoint
-        const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
-        window.location.href = `${backendUrl}/api/user/google`;
-    };
+    const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+    window.location.href = `${backendUrl}/api/user/google`;
+};
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
@@ -85,7 +84,7 @@ function Login() {
                 </CardHeader>
                 
                 <CardContent>
-                    {/* ✅ ADD: Google Login Button */}
+                    {/*Google Login Button */}
                     <Button
                         type="button"
                         onClick={handleGoogleLogin}
@@ -95,7 +94,7 @@ function Login() {
                         <span className="ml-2 font-semibold">Continue with Google</span>
                     </Button>
 
-                    {/* ✅ ADD: Divider */}
+                    {/*Divider */}
                     <div className="relative my-6">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-gray-200"></div>

@@ -12,7 +12,7 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
     
     let parsed = ContentParser.parse(content, documentType, cbcEntry);
     
-    // TEMPORARY FIX: If table parsing fails but content has tables, force table detection
+    //If table parsing fails but content has tables, force table detection
     if (parsed.type !== 'table' && content.includes('|') && 
         (documentType === 'Lesson Concept Breakdown' || documentType === 'Schemes of Work')) {
       console.log('[TEMP FIX] Forcing table detection for', documentType);
@@ -57,7 +57,7 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
     return formatted;
   }, [body, documentType, cbcEntry]);
 
-  // ✅ Check if content has web references
+  // Check if content has web references
   const hasWebReferences = useMemo(() => {
     return content && content.includes('📊 Visual Learning Resources');
   }, [content]);
@@ -106,7 +106,7 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
         </div>
       )}
       
-      {/* ✅ Web References Info Banner */}
+      {/* Web References Info Banner */}
       {hasWebReferences && (
         <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-r-lg">
           <div className="flex items-start gap-3">

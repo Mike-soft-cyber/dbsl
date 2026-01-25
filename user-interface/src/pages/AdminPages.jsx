@@ -30,7 +30,6 @@ import Navbar from "@/components/ui/dashboard/NavBar";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import axios from "axios";
 
-// API configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 const SERVER_BASE_URL = API_BASE_URL.replace("/api", "");
 
@@ -57,7 +56,6 @@ export default function AdminPages() {
     { label: "Settings", icon: Settings, path: "/adminPages/adminSettings" }
   ];
 
-  // Check mobile screen
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -69,7 +67,6 @@ export default function AdminPages() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle scroll detection
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 10) {
@@ -88,7 +85,7 @@ export default function AdminPages() {
     };
   }, [isMobile]);
 
-  // Fetch school logo and details
+
   useEffect(() => {
     const fetchSchoolData = async () => {
       try {
@@ -208,7 +205,6 @@ export default function AdminPages() {
 
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 w-full">
-          {/* NAVBAR - ALWAYS VISIBLE ON BOTH DESKTOP AND MOBILE */}
           <Navbar userData={userData} />
           
           <div className="flex flex-1">
@@ -225,15 +221,13 @@ export default function AdminPages() {
             <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
               isScrolled ? 'shadow-[0_-4px_20px_rgba(0,0,0,0.1)]' : ''
             }`}>
-              {/* Bottom navigation container */}
               <div className="bg-white border-t border-gray-200 relative">
-                {/* Mobile navigation menu */}
-                <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center justify-between px-1 py-2">
                   {menuItems.map(({ label, icon: Icon, path }) => (
                     <button
                       key={label}
                       onClick={() => handleNavigation(path)}
-                      className={`flex flex-col items-center p-2 flex-1 min-w-0 ${
+                      className={`flex flex-col items-center p-1 flex-1 min-w-0 ${
                         isActive(path)
                           ? 'text-teal-600'
                           : 'text-gray-600 hover:text-teal-600'
@@ -246,35 +240,35 @@ export default function AdminPages() {
                       }`}>
                         <Icon className="h-5 w-5" />
                       </div>
-                      <span className="text-xs font-medium truncate w-full text-center">{label}</span>
+                      <span className="text-[10px] font-medium whitespace-nowrap overflow-visible text-center px-1 leading-tight">
+                        {label}
+                      </span>
                     </button>
                   ))}
-                  
-                  {/* More/Menu button for additional options */}
+
                   <button
                     onClick={() => setIsSidebarOpen(true)}
-                    className="flex flex-col items-center p-2 flex-1 min-w-0 text-gray-600 hover:text-teal-600"
+                    className="flex flex-col items-center p-1 flex-1 min-w-0 text-gray-600 hover:text-teal-600"
                   >
                     <div className="p-2 rounded-lg mb-1 bg-gray-50 hover:bg-teal-50">
                       <MoreVertical className="h-5 w-5" />
                     </div>
-                    <span className="text-xs font-medium truncate w-full text-center">More</span>
+                    <span className="text-[10px] font-medium whitespace-nowrap overflow-visible text-center px-1 leading-tight">
+                      More
+                    </span>
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Mobile Sidebar Menu (Slide-up) - Only for "More" options */}
           {isMobile && isSidebarOpen && (
             <div className="md:hidden fixed inset-0 z-50">
-              {/* Backdrop */}
               <div 
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={() => setIsSidebarOpen(false)}
               />
               
-              {/* Slide-up menu */}
               <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl transform transition-transform duration-300 animate-in slide-in-from-bottom-full max-h-[70vh] overflow-y-auto">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-4">
@@ -301,7 +295,6 @@ export default function AdminPages() {
                     </button>
                   </div>
 
-                  {/* Quick Actions */}
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     <button
                       onClick={() => {
@@ -325,7 +318,6 @@ export default function AdminPages() {
                     </button>
                   </div>
 
-                  {/* Additional Links */}
                   <div className="space-y-1 border-t border-gray-100 pt-4">
                     <button
                       onClick={() => {

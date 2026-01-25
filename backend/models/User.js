@@ -1,4 +1,4 @@
-// model/User.js - Simplified version
+
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -58,7 +58,7 @@ const userSchema = new mongoose.Schema({
     },
     isVerified: { 
         type: Boolean, 
-        default: true // Set to true by default
+        default: true 
     },
     signupMethod: { 
         type: String, 

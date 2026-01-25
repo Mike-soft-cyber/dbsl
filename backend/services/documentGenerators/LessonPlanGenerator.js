@@ -11,7 +11,7 @@ class LessonPlanGenerator extends BaseDocumentGenerator {
       date, time, specificConcept, lessonNumber, weekNumber 
     } = requestData;
 
-    // Extract and format CBC data
+    
     const sloList = cbcEntry?.slo || [];
     const learningExperiences = cbcEntry?.learningExperiences || [];
     const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
@@ -19,25 +19,25 @@ class LessonPlanGenerator extends BaseDocumentGenerator {
     const coreCompetencies = cbcEntry?.coreCompetencies || [];
     const values = cbcEntry?.values || [];
     
-    // Format SLOs properly
+    
     let formattedSLOs = 'Not specified';
     if (sloList.length > 0) {
       formattedSLOs = sloList.map((slo, i) => `${i+1}. ${slo}`).join('\n');
     }
 
-    // Format learning experiences
+    
     let formattedExperiences = 'Not specified';
     if (learningExperiences.length > 0) {
       formattedExperiences = learningExperiences.map((exp, i) => `${i+1}. ${exp}`).join('\n');
     }
 
-    // Format key inquiry questions
+    
     let formattedQuestions = 'Not specified';
     if (keyInquiryQuestions.length > 0) {
       formattedQuestions = keyInquiryQuestions.map((q, i) => `${i+1}. ${q}`).join('\n');
     }
 
-    // Format resources
+    
     let formattedResources = 'Not specified';
     if (resources.length > 0) {
       formattedResources = resources.join(', ');

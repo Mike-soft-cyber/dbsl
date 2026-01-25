@@ -1,4 +1,4 @@
-// routes/teacherRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const teacherController = require('../controllers/userController');
@@ -6,10 +6,10 @@ const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/uploadMiddleware');
 const User = require('../models/User');
 
-// Apply auth middleware to all routes
+
 router.use(authMiddleware);
 
-// app.use('/api/teachers')
+
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const User = require('../models/User');
@@ -29,7 +29,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       signupMethod: user.signupMethod
     });
 
-    // ✅ Return complete user object including profilePic
+    
     res.json({
       _id: user._id,
       firstName: user.firstName,
@@ -39,7 +39,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       schoolName: user.schoolName,
       schoolCode: user.schoolCode,
       phone: user.phone,
-      profilePic: user.profilePic, // ✅ Critical for Google OAuth users
+      profilePic: user.profilePic, 
       signupMethod: user.signupMethod,
       isVerified: user.isVerified,
       assignedClasses: user.assignedClasses,
@@ -70,10 +70,10 @@ router.get('/:userId/debug-counts', teacherController.debugUserCounts);
 router.get('/:userId/fix-counts', teacherController.fixUserCounts);
 router.get('/profile', authMiddleware, teacherController.getProfile);
 
-// Profile picture upload route with proper error handling
+
 router.post(
   "/upload-profile-pic/:id",
-  upload.single("profilePic"), // field name must match frontend FormData
+  upload.single("profilePic"), 
   async (req, res) => {
     try {
       if (!req.file) {
@@ -83,7 +83,7 @@ router.post(
       const teacherId = req.params.id;
       const fileName = req.file.filename;
 
-      // Update teacher document with new profilePic
+      
       const updatedTeacher = await User.findByIdAndUpdate(
         teacherId,
         { profilePic: fileName },
@@ -100,11 +100,11 @@ router.post(
         profilePic: fileName,
       });
     } catch (err) {
-      console.error("❌ Upload error:", err); // ✅ show exact error in backend console
+      console.error("❌ Upload error:", err); 
       res.status(500).json({
         success: false,
         message: "Server error while uploading file",
-        error: err.message, // ✅ include real error in response
+        error: err.message, 
       });
     }
   }

@@ -14,7 +14,6 @@ const GenerateSchemeButton = ({ document }) => {
       
       console.log('🚀 Generating Scheme of Work from breakdown:', document._id);
 
-      // ✅ FIX: Use import.meta.env instead of process.env
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
       
       console.log('API Base URL:', API_BASE_URL); // Debug log

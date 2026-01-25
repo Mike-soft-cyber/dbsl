@@ -75,7 +75,6 @@ const LinkedDocumentButton = ({ document }) => {
     // Show success message
     toast.success('Lesson Notes generated successfully!');
     
-    // ✅ FIX: Navigate immediately without setTimeout
     window.location.href = `/documents/${newDocumentId}`;
     
   } else {

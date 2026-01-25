@@ -34,7 +34,7 @@ export default function DashBoard() {
         fetchClasses();
     }, [userData?._id]);
 
-    // ✅ FIXED: Fetch PERSONAL downloads count
+    // Fetch PERSONAL downloads count
     const fetchPersonalDownloadsCount = async () => {
         if (!userData?._id) return;
         try {
@@ -46,7 +46,7 @@ export default function DashBoard() {
         }
     };
 
-    // ✅ FIXED: Fetch documents created count
+    // Fetch documents created count
     const fetchDocumentsCreatedCount = async () => {
         if (!userData?._id) return;
         try {
@@ -58,7 +58,7 @@ export default function DashBoard() {
         }
     };
 
-    // ✅ Fetch both stats when component loads
+    // Fetch both stats when component loads
     useEffect(() => {
         if (userData?._id) {
             fetchPersonalDownloadsCount();
@@ -66,7 +66,7 @@ export default function DashBoard() {
         }
     }, [userData?._id]);
 
-    // ✅ ADD: Listen for download events to refresh stats
+    // Listen for download events to refresh stats
     useEffect(() => {
         const handleDocumentDownloaded = () => {
             console.log('📥 Dashboard: Document downloaded, refreshing stats...');
@@ -81,7 +81,7 @@ export default function DashBoard() {
         };
     }, []);
 
-    // ✅ ADD: Periodic refresh (optional)
+    // Periodic refresh (optional)
     useEffect(() => {
         const interval = setInterval(() => {
             if (userData?._id) {

@@ -60,7 +60,7 @@ export default function CbcDataDash() {
   const [resources, setResources] = useState([""]);
   const [assessment, setAssessment] = useState([{ skill: "", exceeds: "", meets: "", approaches: "", below: "" }]);
   
-  // ✅ UPDATED: KICD curriculum fields as arrays
+  // KICD curriculum fields as arrays
   const [coreCompetencies, setCoreCompetencies] = useState([""]);
   const [values, setValues] = useState([""]);
   const [pertinentIssues, setPertinentIssues] = useState([""]);
@@ -258,56 +258,6 @@ export default function CbcDataDash() {
     setEditedRow((prev) => ({
       ...prev,
       [field]: value,
-    }));
-  };
-
-  const handleArrayFieldChange = (field, index, value) => {
-    const newArray = [...editedRow[field]];
-    newArray[index] = value;
-    setEditedRow(prev => ({
-      ...prev,
-      [field]: newArray
-    }));
-  };
-
-  const handleAddArrayItem = (field) => {
-    setEditedRow(prev => ({
-      ...prev,
-      [field]: [...prev[field], ""]
-    }));
-  };
-
-  const handleRemoveArrayItem = (field, index) => {
-    if (editedRow[field].length === 1) return;
-    const newArray = editedRow[field].filter((_, i) => i !== index);
-    setEditedRow(prev => ({
-      ...prev,
-      [field]: newArray
-    }));
-  };
-
-  const handleAssessmentChange = (index, field, value) => {
-    const newAssessment = [...editedRow.assessment];
-    newAssessment[index][field] = value;
-    setEditedRow(prev => ({
-      ...prev,
-      assessment: newAssessment
-    }));
-  };
-
-  const handleAddAssessment = () => {
-    setEditedRow(prev => ({
-      ...prev,
-      assessment: [...prev.assessment, { skill: "", exceeds: "", meets: "", approaches: "", below: "" }]
-    }));
-  };
-
-  const handleRemoveAssessment = (index) => {
-    if (editedRow.assessment.length === 1) return;
-    const newAssessment = editedRow.assessment.filter((_, i) => i !== index);
-    setEditedRow(prev => ({
-      ...prev,
-      assessment: newAssessment
     }));
   };
 
@@ -541,7 +491,7 @@ export default function CbcDataDash() {
                       </div>
                     </div>
 
-                    {/* ✅ UPDATED: KICD Curriculum Integration Section with Inputs */}
+                    {/*KICD Curriculum Integration Section with Inputs */}
                     <div className="space-y-6 pt-6 border-t border-gray-100">
                       <h3 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
                         <Globe className="h-5 w-5 text-green-600" />

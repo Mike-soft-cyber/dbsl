@@ -12,13 +12,13 @@ exports.registerTeacher = async (req, res) => {
     try {
         const { firstName, lastName, email, password, schoolCode } = req.body;
 
-        // Check if user already exists
+        
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'Teacher already exists with this email' });
         }
 
-        // Hash password
+        
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = new User({
@@ -133,7 +133,7 @@ exports.postStreamsOfSchool = async (req, res) => {
     }
 };
 
-// GET streams for a school
+
 exports.getStreams = async (req, res) => {
     const { schoolCode } = req.params;
     try {
@@ -185,9 +185,9 @@ exports.assignClass = async (req, res) => {
             return res.status(404).json({ message: 'Teacher not found' });
         }
 
-        // ✅ FIX: Use the correct function name from activityController
+        
         const teacherName = `${assign.firstName} ${assign.lastName}`;
-        await activityController.teacherAssignedClassActivity({ // Make sure this function exists
+        await activityController.teacherAssignedClassActivity({ 
             teacherName,
             teacherId: id,
             assignedClasses: [{ grade, stream, learningArea }],
@@ -201,7 +201,7 @@ exports.assignClass = async (req, res) => {
     }
 };
 
-// In removeFromAssignedClasses function
+
 exports.removeFromAssignedClasses = async (req, res) => {
     try {
         const { id } = req.params;
@@ -219,9 +219,9 @@ exports.removeFromAssignedClasses = async (req, res) => {
 
         if (!remove) return res.status(404).json({ message: 'Teacher not found' });
 
-        // ✅ FIX: Use the correct function name
+        
         const teacherName = `${remove.firstName} ${remove.lastName}`;
-        await activityController.teacherRemovedClassActivity({ // Make sure this function exists
+        await activityController.teacherRemovedClassActivity({ 
             teacherName,
             teacherId: id,
             removedClass: { grade, stream, learningArea },
@@ -258,7 +258,7 @@ exports.uploadProfilePic = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const userId = req.params.id || req.userId; // fallback to token userId
+    const userId = req.params.id || req.userId; 
     const filePath = req.file.filename;
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -281,7 +281,7 @@ exports.uploadProfilePic = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Upload failed',
-      error: err.message, // ✅ show real error instead of crashing
+      error: err.message, 
     });
   }
 };
@@ -338,7 +338,7 @@ exports.verifyEmail = async (req, res) => {
     }
 };
 
-// Add this to your userController.js
+
 exports.getUserDownloadsCount = async (req, res) => {
     const { userId } = req.params;
 
@@ -359,7 +359,7 @@ exports.getUserDownloadsCount = async (req, res) => {
     }
 };
 
-// Also add this if you want to get documents created count
+
 exports.getUserDocumentsCreatedCount = async (req, res) => {
     const { userId } = req.params;
 
@@ -381,7 +381,7 @@ exports.getUserDocumentsCreatedCount = async (req, res) => {
 };
 
 
-// Track document download
+
 exports.trackDocumentDownload = async (req, res) => {
     const { userId } = req.params;
     const { documentId, documentType, grade, subject, strand, substrand, learningArea } = req.body;
@@ -417,9 +417,9 @@ exports.trackDocumentDownload = async (req, res) => {
 
         console.log(`✅ Download tracked for user ${userId}. New download count: ${user.downloads}`);
 
-        // ✅ FIX: Use the correct function name
+        
         const teacherName = `${user.firstName} ${user.lastName}`;
-        await activityController.docDownloadedActivity({ // Make sure this function exists
+        await activityController.docDownloadedActivity({ 
             teacherName,
             teacherId: userId,
             docType: documentType,
@@ -469,7 +469,7 @@ exports.deleteDownloadFromHistory = async (req, res) => {
     }
 };
 
-// Add to userController.js
+
 exports.debugUserCounts = async (req, res) => {
   const { userId } = req.params;
   
@@ -494,7 +494,7 @@ exports.debugUserCounts = async (req, res) => {
   }
 };
 
-// Add this function to userController.js
+
 exports.fixUserCounts = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -503,16 +503,16 @@ exports.fixUserCounts = async (req, res) => {
       return res.status(400).json({ message: "Invalid userId" });
     }
 
-    // Count documents created by this user
+    
     const documentsCreatedCount = await Document.countDocuments({ 
       teacher: userId 
     });
     
-    // Count downloads from downloadedDocuments array
+    
     const user = await User.findById(userId);
     const downloadsCount = user.downloadedDocuments ? user.downloadedDocuments.length : 0;
     
-    // Update the user document
+    
     const updatedUser = await User.findByIdAndUpdate(
       userId, 
       {
@@ -548,7 +548,7 @@ exports.fixUserCounts = async (req, res) => {
   }
 };
 
-// Add this function - no auth required
+
 exports.fixUserCountsDebug = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -559,16 +559,16 @@ exports.fixUserCountsDebug = async (req, res) => {
 
     console.log('🔄 Fixing counts for user:', userId);
     
-    // Count documents created by this user
+    
     const documentsCreatedCount = await Document.countDocuments({ 
       teacher: userId 
     });
     
-    // Count downloads from downloadedDocuments array
+    
     const user = await User.findById(userId);
     const downloadsCount = user.downloadedDocuments ? user.downloadedDocuments.length : 0;
     
-    // Update the user document
+    
     const updatedUser = await User.findByIdAndUpdate(
       userId, 
       {
@@ -635,7 +635,7 @@ exports.debugUserDownloads = async (req, res) => {
   }
 };
 
-// Add this function to get school configuration
+
 exports.getSchoolConfig = async (req, res) => {
     try {
         const { schoolCode } = req.params;
@@ -647,7 +647,7 @@ exports.getSchoolConfig = async (req, res) => {
             });
         }
 
-        // Find school config
+        
         const schoolConfig = await SchoolConfig.findOne({ schoolCode });
         
         if (!schoolConfig) {
@@ -689,7 +689,7 @@ exports.getProfile = async (req, res) => {
       signupMethod: user.signupMethod
     });
 
-    // ✅ Return complete user object including profilePic
+    
     res.json({
       _id: user._id,
       firstName: user.firstName,
@@ -699,7 +699,7 @@ exports.getProfile = async (req, res) => {
       schoolName: user.schoolName,
       schoolCode: user.schoolCode,
       phone: user.phone,
-      profilePic: user.profilePic, // ✅ Critical for Google OAuth users
+      profilePic: user.profilePic, 
       signupMethod: user.signupMethod,
       isVerified: user.isVerified,
       assignedClasses: user.assignedClasses,

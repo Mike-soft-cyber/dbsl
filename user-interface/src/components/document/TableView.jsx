@@ -1,4 +1,3 @@
-// TableView.jsx - FIXED VERSION with proper SLO handling
 import React from 'react';
 
 const TableView = ({ data, strand, substrand, cbcEntry }) => {
@@ -12,7 +11,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
 
   let fixedData = { ...data };
   
-  // ✅ SPECIAL FIX FOR SCHEMES OF WORK
   const isSchemesOfWork = data.headers.some(h => 
     h.toUpperCase().includes('SPECIFIC LEARNING OUTCOMES') ||
     h.toUpperCase().includes('KEY INQUIRY QUESTION') ||
@@ -22,7 +20,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
   if (isSchemesOfWork) {
     console.warn('[TableView] ⚠️ Schemes of Work detected with', data.headers.length, 'columns');
     
-    // Define the correct 10-column structure
     const correctHeaders = [
       'WEEK', 'LESSON', 'STRAND', 'SUB-STRAND',
       'SPECIFIC LEARNING OUTCOMES (SLO)', 'LEARNING EXPERIENCES',
@@ -30,25 +27,22 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       'ASSESSMENT', 'REFLECTION'
     ];
     
-    // ✅ Get SLOs from cbcEntry
     let sloList = cbcEntry?.slo || [];
     
-    // ✅ CRITICAL FIX: Handle combined SLOs in a single string
     if (sloList.length === 1 && sloList[0].includes('b)')) {
       console.log('[TableView] ⚠️ Detected combined SLOs, splitting...');
       const combined = sloList[0];
       // Split by lowercase letter followed by closing parenthesis
       sloList = combined
-        .split(/(?=[a-z]\))/) // Split before each "a)", "b)", "c)", etc.
-        .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim()) // Remove the letter prefix
-        .filter(slo => slo.length > 5); // Filter out empty strings
+        .split(/(?=[a-z]\))/)
+        .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim())
+        .filter(slo => slo.length > 5);
       
       console.log(`[TableView] ✅ Split into ${sloList.length} separate SLOs:`, sloList.map(s => s.substring(0, 40)));
     }
     
     console.log('[TableView] Available SLOs:', sloList.length);
     
-    // ✅ CRITICAL FIX: Handle combined Learning Experiences
     let learningExperiences = cbcEntry?.learningExperiences || [];
     
     if (learningExperiences.length === 1 && learningExperiences[0].includes('•')) {
@@ -67,7 +61,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       console.log(`[TableView] ✅ Split into ${learningExperiences.length} separate experiences`);
     }
     
-    // ✅ CRITICAL FIX: Handle combined Key Inquiry Questions
     let keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
     
     if (keyInquiryQuestions.length === 1 && /\d+\.\s/.test(keyInquiryQuestions[0])) {
@@ -86,7 +79,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       console.log(`[TableView] ✅ Split into ${keyInquiryQuestions.length} separate questions`);
     }
     
-    // Create a map of what data we actually have
     const dataMap = new Map();
     data.headers.forEach((h, i) => {
       const normalized = h.toUpperCase();
@@ -102,11 +94,9 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       else if (normalized.includes('REFLECTION')) dataMap.set('REFLECTION', i);
     });
     
-    // ✅ Use passed props or try to extract from data
     let defaultStrand = strand || 'NATURAL ENVIRONMENT';
     let defaultSubstrand = substrand || 'Soil';
     
-    // If no props provided, try to find in the first few rows
     if (!strand && dataMap.has('STRAND')) {
       for (let i = 0; i < Math.min(5, data.rows.length); i++) {
         const row = data.rows[i];
@@ -131,47 +121,38 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
     
     console.log('[TableView] Using - Strand:', defaultStrand, 'Substrand:', defaultSubstrand);
     
-    // ✅ CRITICAL FIX: Function to get appropriate SLO for each lesson
     const getSLOForLesson = (lessonIndex) => {
       if (sloList.length === 0) {
         return '(a) Learners will achieve the learning outcomes for this lesson';
       }
       
-      // Distribute SLOs evenly across lessons
-      // Each SLO gets roughly equal number of lessons
       const lessonsPerSLO = Math.ceil(data.rows.length / sloList.length);
       const sloIndex = Math.floor(lessonIndex / lessonsPerSLO);
       const actualIndex = Math.min(sloIndex, sloList.length - 1);
-      const letter = String.fromCharCode(97 + actualIndex); // a, b, c, d...
+      const letter = String.fromCharCode(97 + actualIndex);
       
       return `(${letter}) ${sloList[actualIndex]}`;
     };
     
-    // ✅ Function to get appropriate learning experience
+    //get appropriate learning experience
     const getLearningExperience = (lessonIndex) => {
       if (learningExperiences.length === 0) {
         return 'Learners engage in learning activities';
       }
       
-      // ✅ FIX: Rotate through ALL experiences more frequently
-      // Instead of keeping same experience for entire SLO section, rotate every 2-3 lessons
       const rotationIndex = Math.floor(lessonIndex / 2); // Change every 2 lessons
       return learningExperiences[rotationIndex % learningExperiences.length];
     };
     
-    // ✅ Function to get appropriate key inquiry question
     const getKeyInquiryQuestion = (lessonIndex) => {
       if (keyInquiryQuestions.length === 0) {
         return 'What did we learn?';
       }
-      
-      // ✅ FIX: Rotate through ALL questions more frequently
-      // Change question every 2-3 lessons for variety
-      const rotationIndex = Math.floor(lessonIndex / 3); // Change every 3 lessons
+
+      const rotationIndex = Math.floor(lessonIndex / 3);
       return keyInquiryQuestions[rotationIndex % keyInquiryQuestions.length];
     };
     
-    // ✅ Function to get varied assessment methods
     const getAssessment = (lessonIndex) => {
       const assessmentMethods = [
         'Observation',
@@ -183,7 +164,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       return assessmentMethods[lessonIndex % assessmentMethods.length];
     };
     
-    // ✅ Function to get varied reflection questions
     const getReflection = (lessonIndex, sloText) => {
       const reflectionTemplates = [
         'Were learners able to meet objectives?',
@@ -201,20 +181,19 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       const weekNum = Math.floor(rowIndex / 5) + 1; // Adjust based on lessons per week
       const lessonNum = rowIndex + 1;
       
-      // ✅ CORRECTED: Map data to correct columns with proper SLO distribution and variety
       const sloText = getSLOForLesson(rowIndex);
       
       const newRow = [
-        `Week ${weekNum}`,                                           // WEEK
-        `Lesson ${lessonNum}`,                                       // LESSON
-        defaultStrand,                                               // STRAND
-        defaultSubstrand,                                            // SUB-STRAND
-        sloText,                                                     // ✅ SLO - Distributed properly
-        getLearningExperience(rowIndex),                             // ✅ LEARNING EXPERIENCES - Rotated every 2 lessons
-        getKeyInquiryQuestion(rowIndex),                             // ✅ KEY INQUIRY QUESTION - Rotated every 3 lessons
-        row[dataMap.get('RESOURCES')] || 'Realia, charts',         // LEARNING RESOURCES
-        getAssessment(rowIndex),                                     // ✅ ASSESSMENT - Varied
-        getReflection(rowIndex, sloText)                             // ✅ REFLECTION - Varied
+        `Week ${weekNum}`,                                          
+        `Lesson ${lessonNum}`,                                       
+        defaultStrand,                                               
+        defaultSubstrand,                                            
+        sloText,                                                     
+        getLearningExperience(rowIndex),                             
+        getKeyInquiryQuestion(rowIndex),                             
+        row[dataMap.get('RESOURCES')] || 'Realia, charts',         
+        getAssessment(rowIndex),                                     
+        getReflection(rowIndex, sloText)                             
       ];
       
       return newRow;
@@ -223,33 +202,29 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
     console.log('[TableView] ✅ Reconstructed Schemes of Work with all 10 columns');
     console.log('[TableView] Sample SLO:', fixedData.rows[0][4]);
   }
-  // ✅ FIX FOR LESSON CONCEPT BREAKDOWN
+
   else {
-    // Check if WEEK column is missing
+
     if (data.headers.some(h => h.toLowerCase().includes('learning concept'))) {
     console.log('[TableView] ✅ Lesson Concept Breakdown detected');
     
     const standardHeaders = ['WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT', 'REFLECTION'];
     
-    // Ensure we have exactly 5 columns
+
     if (data.headers.length !== 5 || !arraysEqual(data.headers.map(h => h.toUpperCase()), standardHeaders)) {
       console.log('[TableView] ⚠️ Fixing columns for Lesson Concept Breakdown');
       
       fixedData.headers = standardHeaders;
       
-      // Reconstruct rows with 5 columns
       fixedData.rows = data.rows.map(row => {
         const newRow = [...row];
         
-        // Pad with empty values if needed
         while (newRow.length < 4) newRow.push('');
         
-        // Ensure we have Reflection column
         if (newRow.length === 4) {
           newRow.push('Were learners able to meet the learning objectives?');
         }
         
-        // Trim to 5 columns if needed
         if (newRow.length > 5) newRow.length = 5;
         
         return newRow;

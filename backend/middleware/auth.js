@@ -1,10 +1,10 @@
-// middleware/auth.js - Make sure your middleware looks like this
+
 
 const jwt = require('jsonwebtoken');
 
 const authenticate = (req, res, next) => {
   try {
-    // Get token from Authorization header
+    
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -19,12 +19,12 @@ const authenticate = (req, res, next) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    // Verify token
+    
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     console.log('✅ Token verified for user:', decoded.email);
     
-    // Attach user info to request
+    
     req.user = {
       id: decoded.id,
       email: decoded.email,

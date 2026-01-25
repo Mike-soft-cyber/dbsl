@@ -10,22 +10,22 @@ const SubjectConfig = require('../models/SubjectConfig');
 const path = require('path');
 const fs = require('fs');
 
-// ADD MISSING IMPORTS
+
 const { OpenAI } = require("openai");
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY 
 });
 
-// Your existing simple function - FIXED
-// Your existing simple function - WITH ACTIVITY TRACKING
+
+
 exports.createDocument = async (req, res) => {
   try {
     const { type, term, cbcEntry } = req.body;
     const teacher = req.user?._id || null;
 
-    // Simple AI generation - FIXED model name
+    
     const aiResponse = await openai.chat.completions.create({
-      model: "gpt-4", // FIXED: was "gpt-5"
+      model: "gpt-4", 
       messages: [
         { role: "system", content: "You are a teacher assistant AI." },
         { role: "user", content: `Generate a ${type} for ${term} using CBC entry ID ${cbcEntry}` }
@@ -43,14 +43,14 @@ exports.createDocument = async (req, res) => {
       content,
     });
 
-    // ✅ ADD ACTIVITY TRACKING HERE TOO
+    
     try {
       const activityData = {
         teacherName: req.user?.firstName + ' ' + (req.user?.lastName || ''),
         teacherId: req.user?._id,
-        grade: 'Unknown', // You might want to get this from cbcEntry
+        grade: 'Unknown', 
         stream: 'General',
-        learningArea: 'Unknown', // You might want to get this from cbcEntry
+        learningArea: 'Unknown', 
         docType: type,
         schoolCode: req.user?.schoolCode,
         documentId: document._id
@@ -61,7 +61,7 @@ exports.createDocument = async (req, res) => {
       console.log('✅ Simple document creation activity logged successfully');
     } catch (activityError) {
       console.error('❌ Failed to log simple document activity:', activityError);
-      // Don't fail the whole request if activity logging fails
+      
     }
 
     res.status(201).json(document);
@@ -71,7 +71,7 @@ exports.createDocument = async (req, res) => {
   }
 };
 
-// Keep all your existing simple functions unchanged
+
 exports.getDocument = async (req, res) => {
   try {
     const document = Document.schema.path('type').enumValues;
@@ -138,8 +138,8 @@ exports.getDocCountOfSchool = async (req, res) => {
   }
 };
 
-// SIMPLIFIED enhanced generation - WITH ACTIVITY TRACKING
-// ✅ ENHANCED: Generate document with proper curriculum configuration
+
+
 exports.generateDocumentEnhanced = async (req, res) => {
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -147,7 +147,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
   try {
     console.log(`[${requestId}] Starting document generation request`);
     
-    // Input validation
+    
     const validationResult = validateGenerationRequest(req.body);
     if (!validationResult.isValid) {
       console.log(`[${requestId}] Validation failed:`, validationResult.errors);
@@ -164,7 +164,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
 
     console.log(`[${requestId}] ✅ Request: ${type} for ${grade} ${learningArea}`);
 
-    // ✅ STEP 1: Fetch curriculum configuration
+    
     console.log(`[${requestId}] Fetching curriculum configuration...`);
     
     const levelConfig = await LevelConfig.findOne({ 
@@ -180,7 +180,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
       console.warn(`[${requestId}] ⚠️ Missing curriculum config, using defaults`);
     }
 
-    // ✅ STEP 2: Calculate weeks based on term
+    
     const termNumber = term?.replace('Term ', '').replace('term', '');
     const weekMap = {
       '1': subjectConfig?.termWeeks?.term1 || 10,
@@ -189,7 +189,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
     };
     const weeksForTerm = weekMap[termNumber] || 10;
 
-    // ✅ STEP 3: Build request data with curriculum config
+    
     const requestData = {
       school: sanitizeInput(school) || "Educational Institution",
       teacherName: sanitizeInput(teacherName) || "Teacher",
@@ -198,7 +198,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
       strand: sanitizeInput(strand),
       substrand: sanitizeInput(substrand),
       term: sanitizeInput(term),
-      // ✅ CRITICAL: Use curriculum configuration
+      
       weeks: weeksForTerm,
       lessonsPerWeek: subjectConfig?.lessonsPerWeek || 5,
       lessonDuration: levelConfig?.lessonDuration || 40,
@@ -206,7 +206,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
       teacher: req.body.teacher
     };
 
-    // ✅ Log final configuration
+    
     console.log(`[${requestId}] ✅ Curriculum configuration:`, {
       term: term,
       weeks: requestData.weeks,
@@ -215,7 +215,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
       expectedRows: requestData.weeks * requestData.lessonsPerWeek
     });
 
-    // ✅ STEP 4: Find CBC entry
+    
     console.log(`[${requestId}] Fetching CBC entry...`);
     let cbcEntry = await CBCEntry.findOne({ 
       grade: { $regex: new RegExp(grade, 'i') }, 
@@ -233,7 +233,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
 
     console.log(`[${requestId}] ✅ Found CBC entry with ${cbcEntry.slo?.length || 0} SLOs`);
 
-    // ✅ STEP 5: Generate document
+    
     console.log(`[${requestId}] Generating ${type}...`);
     let document = await DocumentGeneratorFactory.generate(type, requestData, cbcEntry);
 
@@ -243,7 +243,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
 
     console.log(`[${requestId}] ✅ Generated document: ${document._id}`);
 
-    // ✅ STEP 6: Track activity
+    
     try {
       const activityData = {
         teacherName: req.user?.firstName + ' ' + (req.user?.lastName || ''),
@@ -262,7 +262,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
       console.error(`[${requestId}] ⚠️ Activity logging failed:`, activityError);
     }
 
-    // ✅ STEP 7: Update user stats
+    
     if (req.user?._id) {
       await User.findByIdAndUpdate(
         req.user._id,
@@ -273,7 +273,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
     const totalTime = Date.now() - startTime;
     console.log(`[${requestId}] ✅ Complete in ${totalTime}ms`);
 
-    // ✅ STEP 8: Return response
+    
     res.status(201).json({
       success: true,
       document: {
@@ -313,7 +313,7 @@ exports.generateDocumentEnhanced = async (req, res) => {
   }
 };
 
-// Keep all your other existing functions unchanged...
+
 exports.debugContent = async (req, res) => {
   try {
     const { content, documentType } = req.body;
@@ -352,7 +352,7 @@ exports.debugContent = async (req, res) => {
   }
 };
 
-// Enhanced fallback diagram serving
+
 exports.diagramFallback = async (req, res) => {
   try {
     const { documentId, diagramIndex } = req.params;
@@ -376,13 +376,13 @@ exports.diagramFallback = async (req, res) => {
     }
     
     try {
-      // Convert base64 back to buffer
+      
       const base64Data = diagram.imageData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
       
-      // Set appropriate headers and send
+      
       res.setHeader('Content-Type', diagram.mimeType || 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 hour cache
+      res.setHeader('Cache-Control', 'public, max-age=86400'); 
       res.setHeader('Content-Length', buffer.length);
       
       console.log(`[DiagramFallback] Serving diagram ${diagramIndex} (${buffer.length} bytes)`);
@@ -405,31 +405,31 @@ exports.serveDiagram = async (req, res) => {
     
     console.log(`[Diagrams] Request for: ${filename}`);
     
-    // Try to serve from file system first
+    
     const uploadDir = path.join(__dirname, '..', 'uploads', 'diagrams');
     const filepath = path.join(uploadDir, filename);
     
     try {
-      // Check if file exists
+      
       await fs.access(filepath);
       
       const stats = await fs.stat(filepath);
       console.log(`[Diagrams] ✅ Serving from file: ${filename} (${stats.size} bytes)`);
       
-      // Set appropriate headers
+      
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 hours
+      res.setHeader('Cache-Control', 'public, max-age=86400'); 
       res.setHeader('Content-Length', stats.size);
       
-      // Send the file
+      
       return res.sendFile(filepath);
       
     } catch (fileError) {
-      // File doesn't exist - try to find it in documents database
+      
       console.log(`[Diagrams] File not found, searching database...`);
       
-      // Extract document ID and diagram number from filename pattern
-      // Pattern: diagram-grade_X-subject-N-timestamp.png
+      
+      
       const match = filename.match(/diagram-.*?-(\d+)-\d+\.png/);
       
       if (!match) {
@@ -439,7 +439,7 @@ exports.serveDiagram = async (req, res) => {
       
       const diagramNumber = parseInt(match[1]);
       
-      // Search for document containing this diagram
+      
       const Document = require('../models/Document');
       const document = await Document.findOne({
         'diagrams.fileName': filename
@@ -450,7 +450,7 @@ exports.serveDiagram = async (req, res) => {
         return res.status(404).json({ error: 'Diagram not found in database' });
       }
       
-      // Find the specific diagram
+      
       const diagram = document.diagrams.find(d => d.fileName === filename);
       
       if (!diagram || !diagram.imageData) {
@@ -458,7 +458,7 @@ exports.serveDiagram = async (req, res) => {
         return res.status(404).json({ error: 'Diagram data not available' });
       }
       
-      // Serve from base64 data
+      
       const base64Data = diagram.imageData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
       
@@ -477,9 +477,9 @@ exports.serveDiagram = async (req, res) => {
   }
 };
 
-/**
- * ✅ NEW: Direct document diagram endpoint (alternative access)
- */
+
+
+
 exports.getDocumentDiagram = async (req, res) => {
   try {
     const { documentId, diagramIndex } = req.params;
@@ -499,7 +499,7 @@ exports.getDocumentDiagram = async (req, res) => {
       return res.status(404).json({ error: 'Diagram not found' });
     }
     
-    // Try file system first
+    
     if (diagram.filePath && diagram.fileName) {
       const uploadDir = path.join(__dirname, '..', 'uploads', 'diagrams');
       const filepath = path.join(uploadDir, diagram.fileName);
@@ -518,7 +518,7 @@ exports.getDocumentDiagram = async (req, res) => {
       }
     }
     
-    // Fallback to base64
+    
     if (diagram.imageData) {
       const base64Data = diagram.imageData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
@@ -540,14 +540,14 @@ exports.getDocumentDiagram = async (req, res) => {
   }
 };
 
-// Get all documents with enhanced filtering and pagination
+
 exports.getAllDocuments = async (req, res) => {
   try {
     const { page = 1, limit = 10, type, grade, subject, search } = req.query;
     
     console.log(`[GetDocuments] Fetching page ${page}, limit ${limit}`);
     
-    // Build filter query
+    
     const filter = {};
     if (type) filter.type = { $regex: new RegExp(type, 'i') };
     if (grade) filter.grade = { $regex: new RegExp(grade, 'i') };
@@ -565,7 +565,7 @@ exports.getAllDocuments = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Get documents with pagination
+    
     const documents = await Document.find(filter)
       .select('type grade subject strand substrand school term createdAt status')
       .sort({ createdAt: -1 })
@@ -594,7 +594,7 @@ exports.getAllDocuments = async (req, res) => {
   }
 };
 
-// Get document by ID with comprehensive data
+
 exports.getDocumentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -625,7 +625,7 @@ exports.getDocumentById = async (req, res) => {
   }
 };
 
-// Validation helper functions
+
 function validateGenerationRequest(body) {
   const errors = [];
   const required = ['type', 'grade', 'learningArea', 'strand', 'substrand', 'term'];

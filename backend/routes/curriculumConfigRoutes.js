@@ -3,7 +3,7 @@ const router = express.Router();
 const LevelConfig = require('../models/LevelConfig');
 const SubjectConfig = require('../models/SubjectConfig');
 
-// Get all levels
+
 router.get('/levels', async (req, res) => {
   try {
     const levels = await LevelConfig.find().sort({ level: 1 });
@@ -13,7 +13,7 @@ router.get('/levels', async (req, res) => {
   }
 });
 
-// Get level by grade
+
 router.get('/level/:grade', async (req, res) => {
   try {
     const level = await LevelConfig.findOne({ grades: req.params.grade });
@@ -26,7 +26,7 @@ router.get('/level/:grade', async (req, res) => {
   }
 });
 
-// Get subjects by grade
+
 router.get('/subjects/:grade', async (req, res) => {
   try {
     const subjects = await SubjectConfig.find({ grades: req.params.grade });
@@ -36,7 +36,7 @@ router.get('/subjects/:grade', async (req, res) => {
   }
 });
 
-// Get subject configuration
+
 router.get('/subject-config/:grade/:subject', async (req, res) => {
   try {
     const config = await SubjectConfig.findOne({
@@ -54,7 +54,7 @@ router.get('/subject-config/:grade/:subject', async (req, res) => {
   }
 });
 
-// Get weeks for a term
+
 router.get('/term-weeks/:term', async (req, res) => {
   try {
     const termNumber = req.params.term.toLowerCase().replace('term ', '').replace('term', '');

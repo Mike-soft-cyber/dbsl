@@ -1,4 +1,4 @@
-// Enhanced content post-processing function
+
 function postProcessGeneratedContent(content, documentType) {
   if (!content) return '';
   
@@ -7,12 +7,12 @@ function postProcessGeneratedContent(content, documentType) {
   
   let processed = content;
   
-  // ✅ FIX: Clean up any multi-line table cells
+  
   if (documentType === 'Lesson Concept Breakdown' || documentType === 'Schemes of Work') {
     processed = cleanupTableCells(processed);
   }
   
-  // Remove any AI artifacts
+  
   processed = processed.replace(/```markdown\n?/g, '');
   processed = processed.replace(/```\n?/g, '');
   processed = processed.trim();
@@ -31,39 +31,39 @@ function cleanupTableCells(content) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Detect table start
+    
     if (line.includes('|') && (line.includes('Term') || line.includes('WEEK'))) {
       inTable = true;
       cleanedLines.push(line);
       continue;
     }
     
-    // Skip separator lines
+    
     if (line.match(/^\|[\s\-:]+\|$/)) {
       cleanedLines.push(line);
       continue;
     }
     
-    // Process table rows
+    
     if (inTable && line.includes('|')) {
       const pipeCount = (line.match(/\|/g) || []).length;
       
-      // If row has proper number of pipes, it's complete
-      if (pipeCount >= 5) { // Adjust based on expected columns
+      
+      if (pipeCount >= 5) { 
         if (currentRow) {
           cleanedLines.push(currentRow);
           currentRow = '';
         }
         cleanedLines.push(line);
       } else {
-        // Row is incomplete, accumulate it
+        
         currentRow += (currentRow ? ' ' : '') + line;
       }
     } else if (inTable && !line.includes('|') && line.length > 0) {
-      // Text without pipes inside table - append to current row
+      
       currentRow += ' ' + line;
     } else {
-      // Not in table
+      
       if (currentRow) {
         cleanedLines.push(currentRow);
         currentRow = '';
@@ -75,7 +75,7 @@ function cleanupTableCells(content) {
     }
   }
   
-  // Add any remaining row
+  
   if (currentRow) {
     cleanedLines.push(currentRow);
   }
@@ -91,10 +91,10 @@ const parseClientLessonConceptBreakdown = (content) => {
   
   if (!content) return null;
   
-  // Clean the content
+  
   let cleanContent = content.replace(/```[\s\S]*?```/g, '');
   
-  // Look for the client's 5-column format: Term, Week, Strand, Sub-strand, Learning Concept
+  
   const lines = cleanContent.split('\n');
   let foundHeader = false;
   let rowNumber = 1;
@@ -102,35 +102,35 @@ const parseClientLessonConceptBreakdown = (content) => {
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Find header row
+    
     if (trimmed.includes('Term') && trimmed.includes('Week') && trimmed.includes('Learning Concept')) {
       foundHeader = true;
       continue;
     }
     
-    // Skip separator row
+    
     if (trimmed.match(/^\|[\s\-\|]*\|$/)) continue;
     
-    // Process data rows after header
+    
     if (foundHeader && trimmed.startsWith('|') && trimmed.endsWith('|')) {
       const cells = trimmed
-        .slice(1, -1) // Remove outer pipes
+        .slice(1, -1) 
         .split('|')
         .map(cell => cell.trim());
       
-      // Client format has 5 columns: Term, Week, Strand, Sub-strand, Learning Concept
+      
       if (cells.length >= 5) {
-        // Add row number as first column to match display format
+        
         const formattedRow = [
           rowNumber.toString(),
-          cells[0], // Term
-          cells[1], // Week
-          cells[2], // Strand
-          cells[3], // Sub-strand
-          cells[4]  // Learning Concept
+          cells[0], 
+          cells[1], 
+          cells[2], 
+          cells[3], 
+          cells[4]  
         ];
         
-        // Only add if learning concept is meaningful and AI-generated
+        
         if (formattedRow[5] && formattedRow[5].length > 10 && 
             !formattedRow[5].includes('Term') && 
             !formattedRow[5].includes('Week') &&
@@ -142,7 +142,7 @@ const parseClientLessonConceptBreakdown = (content) => {
     }
   }
   
-  // Return null if no valid AI-generated content found
+  
   return tableData.rows.length > 0 ? tableData : null;
 };
 
@@ -156,7 +156,7 @@ const parseClientSchemesOfWork = (content, cbcEntry) => {
 
   if (!content) return null;
   
-  // Clean the content
+  
   let cleanContent = content.replace(/```[\s\S]*?```/g, '');
   cleanContent = cleanContent.replace(/^SCHOOL:.*$/gm, '');
   cleanContent = cleanContent.replace(/^FACILITATOR:.*$/gm, '');
@@ -166,22 +166,22 @@ const parseClientSchemesOfWork = (content, cbcEntry) => {
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Skip header and separator rows
+    
     if (trimmed.match(/^\|[\s-]+\|/)) continue;
     if (trimmed.match(/^\|\s*WEEK\s*\|/i)) continue;
     
-    // Process data rows
+    
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       const cells = trimmed
         .slice(1, -1)
         .split('|')
         .map(cell => cell.trim());
       
-      // Client format requires exactly 10 columns
+      
       if (cells.length >= 10) {
         const cleanedCells = cells.slice(0, 10);
         
-        // Only add if content is meaningful and AI-generated
+        
         if (cleanedCells[0] && cleanedCells[1] && 
             !cleanedCells.join('').includes('SCHOOL:') &&
             cleanedCells[4] && cleanedCells[4].length > 20 &&
@@ -192,31 +192,31 @@ const parseClientSchemesOfWork = (content, cbcEntry) => {
     }
   }
   
-  // Return null if no valid AI-generated content found
+  
   return tableData.rows.length > 0 ? tableData : null;
 };
 
-// Content preprocessing
+
 const preprocessContent = (content) => {
   if (!content) return content;
   
-  // Handle the specific format from markdown code blocks
+  
   let processed = content;
   
-  // Extract content from markdown code blocks if present
+  
   const codeBlockMatch = content.match(/```markdown\s*([\s\S]*?)```/);
   if (codeBlockMatch && codeBlockMatch[1]) {
     processed = codeBlockMatch[1].trim();
   }
   
-  // Ensure proper table formatting
-  processed = processed.replace(/\|\s*\/\s*\/\s*\|/g, '| | |'); // Clean empty cells
-  processed = processed.replace(/\|\s*-\s*\|\s*-\s*\|\s*-\s*\|\s*-\s*\|\s*-\s*\|/g, ''); // Remove separator rows
+  
+  processed = processed.replace(/\|\s*\/\s*\/\s*\|/g, '| | |'); 
+  processed = processed.replace(/\|\s*-\s*\|\s*-\s*\|\s*-\s*\|\s*-\s*\|\s*-\s*\|/g, ''); 
   
   return processed;
 };
 
-// Enhanced document structure detection
+
 const detectDocumentStructure = (content) => {
   if (!content) return { isTableFormat: false };
   
@@ -225,7 +225,7 @@ const detectDocumentStructure = (content) => {
   const hasVolumeCapacityContent = /volume.*capacity|capacity.*volume/i.test(content);
   
   return {
-    isTableFormat: true, // Force table detection for this content
+    isTableFormat: true, 
     isLessonConcept: hasLearningConceptHeader || hasTermWeekStructure,
     isSchemeOfWork: false,
     hasVolumeCapacity: hasVolumeCapacityContent

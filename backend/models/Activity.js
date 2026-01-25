@@ -30,16 +30,16 @@ const activitySchema = new mongoose.Schema({
     learningArea: String,
     docType: String,
     documentId: String,
-    // Add new fields for class assignments
+    
     assignedGrades: [String],
     assignedStreams: [String],
     assignedLearningAreas: [String],
-    actionType: String // 'assigned' or 'removed' for class operations
+    actionType: String 
   },
   createdAt: { type: Date, default: Date.now, index: true }
 });
 
-// Add compound index for efficient querying
+
 activitySchema.index({ schoolCode: 1, createdAt: -1 });
 activitySchema.index({ type: 1, createdAt: -1 });
 

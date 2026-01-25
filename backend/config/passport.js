@@ -5,17 +5,14 @@ const crypto = require('crypto');
 
 console.log('🔐 Configuring passport Google OAuth...');
 
-// Debug environment variables
 console.log('🔐 Environment Check:');
 console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✓ Loaded' : '✗ MISSING');
 console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '✓ Loaded' : '✗ MISSING');
 console.log('NODE_ENV:', process.env.NODE_ENV || 'Not set');
 
-// Validate environment variables
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     console.error('❌ FATAL: Google OAuth credentials are missing!');
     console.error('   Make sure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in .env file');
-    // Don't throw error during config, but passport will fail if used
 }
 
 const callbackURL = process.env.NODE_ENV === 'production'
@@ -34,7 +31,6 @@ passport.use(
             proxy: true
         },
         async (req, accessToken, refreshToken, profile, done) => {
-            // ... rest of your strategy code remains the same ...
             try {
                 console.log('🔐 Google OAuth Profile:', {
                     id: profile.id,
@@ -86,7 +82,6 @@ passport.use(
 
 console.log('✅ Google OAuth strategy configured successfully');
 
-// Serialize/Deserialize
 passport.serializeUser((user, done) => {
     done(null, user.id);
 });

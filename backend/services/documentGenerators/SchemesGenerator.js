@@ -1,4 +1,4 @@
-// SchemesGenerator.js - FIXED VERSION with proper SLO distribution
+
 
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
@@ -17,23 +17,23 @@ class SchemesGenerator extends BaseDocumentGenerator {
     const safeLessonsPerWeek = lessonsPerWeek || 5;
     const totalRows = safeWeeks * safeLessonsPerWeek;
     
-    // ✅ CRITICAL FIX: Split combined SLOs
+    
     let sloList = cbcEntry?.slo || [];
     
-    // Check if SLOs are combined in a single string (e.g., "a) ... b) ... c) ...")
+    
     if (sloList.length === 1 && sloList[0].includes('b)')) {
       console.log('[SchemesGen] ⚠️ Detected combined SLOs, splitting...');
       const combined = sloList[0];
-      // Split by lowercase letter followed by closing parenthesis
+      
       sloList = combined
-        .split(/(?=[a-z]\))/) // Split before each "a)", "b)", "c)", etc.
-        .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim()) // Remove the letter prefix
-        .filter(slo => slo.length > 5); // Filter out empty strings
+        .split(/(?=[a-z]\))/) 
+        .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim()) 
+        .filter(slo => slo.length > 5); 
       
       console.log(`[SchemesGen] ✅ Split into ${sloList.length} separate SLOs`);
     }
     
-    // ✅ CRITICAL FIX: Split combined Learning Experiences
+    
     let learningExperiences = cbcEntry?.learningExperiences || [];
     
     if (learningExperiences.length === 1 && learningExperiences[0].includes('•')) {
@@ -52,7 +52,7 @@ class SchemesGenerator extends BaseDocumentGenerator {
       console.log(`[SchemesGen] ✅ Split into ${learningExperiences.length} separate experiences`);
     }
     
-    // ✅ CRITICAL FIX: Split combined Key Inquiry Questions
+    
     let keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
     
     if (keyInquiryQuestions.length === 1 && /\d+\.\s/.test(keyInquiryQuestions[0])) {
@@ -73,7 +73,7 @@ class SchemesGenerator extends BaseDocumentGenerator {
     
     const resources = cbcEntry?.resources || [];
 
-    // ✅ Calculate lessons per SLO for distribution
+    
     const lessonsPerSLO = Math.ceil(totalRows / sloList.length);
 
     return `⚠️ CRITICAL: Generate a table with EXACTLY 10 COLUMNS in this EXACT order:

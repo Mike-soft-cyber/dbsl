@@ -1,4 +1,4 @@
-// backend/services/documentGenerators/LessonNotesGenerator.js
+
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
 class LessonNotesGenerator extends BaseDocumentGenerator {
@@ -21,7 +21,7 @@ class LessonNotesGenerator extends BaseDocumentGenerator {
       weeks
     } = requestData;
     
-    // Extract and prepare CBC data
+    
     const sloList = cbcEntry?.slo || [];
     const learningExperiences = cbcEntry?.learningExperiences || [];
     const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
@@ -30,13 +30,13 @@ class LessonNotesGenerator extends BaseDocumentGenerator {
     const values = cbcEntry?.values || ['Sharing', 'Cooperation'];
     const pertinentIssues = cbcEntry?.pertinentIssues || ['Education for Sustainable Development'];
     
-    // ✅ FIXED: Calculate proper values using passed weeks and correct defaults
+    
     const termNumber = term?.replace('Term ', '').replace('term', '');
     const actualWeeks = weeks || 10;
     const actualLessonDuration = lessonDuration || 30;
     const actualAgeRange = ageRange || '4-5 years';
     
-    // CRITICAL: LIMIT concepts to prevent huge prompts
+    
     const allConcepts = learningConcepts || [];
     const limitedConcepts = allConcepts.slice(0, 20);
     
@@ -557,9 +557,9 @@ CONTENT QUALITY:
 Generate professional, comprehensive lesson notes with ACCURATE curriculum information and HONEST, practical resource finding strategies.`;
   }
   
-  // Override generate method to handle concept limiting
+  
   async generate(requestData, cbcEntry) {
-    // Limit concepts to prevent huge prompts
+    
     const originalConcepts = requestData.learningConcepts || [];
     if (originalConcepts.length > 20) {
       console.log(`[Lesson Notes] Limiting concepts from ${originalConcepts.length} to 20`);

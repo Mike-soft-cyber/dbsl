@@ -17,7 +17,7 @@ const levelConfigSchema = new mongoose.Schema({
   },
   lessonDuration: {
     type: Number,
-    required: true // in minutes: 30, 35, or 40
+    required: true 
   },
   grades: [{
     type: String,
@@ -25,7 +25,7 @@ const levelConfigSchema = new mongoose.Schema({
   }],
   ageRange: {
     type: String,
-    required: true // e.g., "4-5 years", "6-8 years"
+    required: true 
   },
   description: String
 }, { timestamps: true });

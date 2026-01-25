@@ -1,4 +1,4 @@
-// DocumentGeneratorFactory.js - SIMPLIFIED VERSION WITHOUT DIAGRAMS
+
 const LessonConceptGenerator = require('./documentGenerators/LessonConceptGenerator');
 const SchemesGenerator = require('./documentGenerators/SchemesGenerator');
 const LessonPlanGenerator = require('./documentGenerators/LessonPlanGenerator');
@@ -77,9 +77,9 @@ class DocumentGeneratorFactory {
     }
   }
 
-  /**
-   * ✅ MAIN GENERATION METHOD - SIMPLIFIED (NO DIAGRAMS)
-   */
+  
+
+
   static async generate(type, requestData, cbcEntry) {
     const startTime = Date.now();
     
@@ -107,20 +107,20 @@ class DocumentGeneratorFactory {
         expectedRows: expectedRows
       });
 
-      // Get the appropriate generator
+      
       const generator = this.generators[type];
       
       if (!generator) {
         throw new Error(`No generator found for type: ${type}`);
       }
 
-      // Generate content
+      
       const aiContent = await generator.generate(requestData, cbcEntry);
       
-      // Process content
+      
       let processedContent = postProcessGeneratedContent(aiContent, type);
       
-      // Create document metadata
+      
       const documentMetadata = {
         generationTime: Date.now() - startTime,
         cbcDataQuality: this.assessCBCQuality(cbcEntry),
@@ -136,7 +136,7 @@ class DocumentGeneratorFactory {
         }
       };
 
-      // Create document
+      
       const newDoc = await Document.create({
         teacher: requestData.teacher,
         type,
@@ -174,9 +174,9 @@ class DocumentGeneratorFactory {
     }
   }
 
-  /**
-   * ✅ Generate Scheme of Work from existing Lesson Concept Breakdown
-   */
+  
+
+
   static async generateSchemeFromConcepts(requestData, cbcEntry) {
     const startTime = Date.now();
     
@@ -189,7 +189,7 @@ class DocumentGeneratorFactory {
         throw new Error('No learning concepts provided');
       }
       
-      // Split combined SLOs/experiences/questions
+      
       let sloList = cbcEntry?.slo || [];
       if (sloList.length === 1 && sloList[0].includes('b)')) {
         sloList = sloList[0]
@@ -208,7 +208,7 @@ class DocumentGeneratorFactory {
         keyInquiryQuestions = keyInquiryQuestions[0].split(/\d+\.\s/).map(q => q.trim()).filter(q => q.length > 5);
       }
       
-      // Build the scheme content
+      
       const schemeContent = this.buildSchemeContentFromConcepts(
         requestData,
         learningConcepts,
@@ -218,7 +218,7 @@ class DocumentGeneratorFactory {
         cbcEntry
       );
       
-      // Create the document
+      
       const newDoc = await Document.create({
         teacher: requestData.teacher,
         type: 'Schemes of Work',
@@ -259,27 +259,27 @@ class DocumentGeneratorFactory {
     }
   }
 
-  /**
-   * ✅ Generate Lesson Plan from a specific concept in breakdown
-   */
+  
+
+
   static async generateLessonPlanFromConcept(requestData, cbcEntry) {
     const startTime = Date.now();
     
     try {
       console.log('[LessonPlanFromConcept] Starting generation for:', requestData.specificConcept);
       
-      // Get the LessonPlanGenerator
+      
       const generator = this.generators['Lesson Plan'];
       
       if (!generator) {
         throw new Error('LessonPlanGenerator not found');
       }
       
-      // Generate the lesson plan content
+      
       const aiContent = await generator.generate(requestData, cbcEntry);
       const processedContent = postProcessGeneratedContent(aiContent, 'Lesson Plan');
       
-      // Create the document
+      
       const newDoc = await Document.create({
         teacher: requestData.teacher,
         type: 'Lesson Plan',
@@ -325,9 +325,9 @@ class DocumentGeneratorFactory {
     }
   }
 
-  /**
-   * ✅ Build Scheme of Work table from learning concepts
-   */
+  
+
+
   static buildSchemeContentFromConcepts(
     requestData,
     learningConcepts,
@@ -341,7 +341,7 @@ class DocumentGeneratorFactory {
     
     const assessmentMethods = ['Observation', 'Oral questions', 'Practical task', 'Portfolio assessment', 'Group discussion'];
     
-    // Build header
+    
     let content = `SCHOOL: ${school}\n`;
     content += `FACILITATOR: ${teacherName}\n`;
     content += `GRADE: ${grade}\n`;
@@ -349,7 +349,7 @@ class DocumentGeneratorFactory {
     content += `TERM: ${term}\n`;
     content += `WEEKS: ${Math.ceil(learningConcepts.length / 5)}\n\n`;
     
-    // Build table
+    
     content += `| WEEK | LESSON | STRAND | SUB-STRAND | SPECIFIC LEARNING OUTCOMES (SLO) | LEARNING EXPERIENCES | KEY INQUIRY QUESTION (KIQ) | LEARNING RESOURCES | ASSESSMENT | REFLECTION |\n`;
     content += `|------|--------|--------|------------|----------------------------------|----------------------|---------------------------|-------------------|------------|------------|\n`;
     
@@ -357,13 +357,13 @@ class DocumentGeneratorFactory {
       const lessonNum = index + 1;
       const weekNum = Math.floor(index / 5) + 1;
       
-      // Map concept to appropriate SLO
+      
       const sloIndex = Math.floor(index / Math.ceil(learningConcepts.length / sloList.length));
       const actualSloIndex = Math.min(sloIndex, sloList.length - 1);
       const letter = String.fromCharCode(97 + actualSloIndex);
       const slo = `(${letter}) ${conceptObj.concept}`;
       
-      // Rotate experiences and questions
+      
       const experience = learningExperiences[Math.floor(index / 2) % learningExperiences.length] || 'Learners engage in learning activities';
       const question = keyInquiryQuestions[Math.floor(index / 3) % keyInquiryQuestions.length] || 'What did we learn?';
       const resource = resources.slice(0, 2).join(', ');
@@ -376,9 +376,9 @@ class DocumentGeneratorFactory {
     return content;
   }
 
-  /**
-   * ✅ Assess CBC data quality
-   */
+  
+
+
   static assessCBCQuality(cbcEntry) {
     let score = 100;
     const issues = [];
@@ -422,17 +422,17 @@ class DocumentGeneratorFactory {
     };
   }
 
-  /**
-   * Clear cache
-   */
+  
+
+
   static clearCache() {
     this.cbcCache.clear();
     console.log('[DocumentGen] CBC cache cleared');
   }
 
-  /**
-   * Get cache stats
-   */
+  
+
+
   static getCacheStats() {
     return {
       size: this.cbcCache.size,
@@ -441,9 +441,9 @@ class DocumentGeneratorFactory {
     };
   }
 
-  /**
-   * Get factory configuration
-   */
+  
+
+
   static getConfig() {
     return {
       maxContentSize: this.MAX_CONTENT_SIZE,

@@ -43,16 +43,16 @@ export default function CreateDocument() {
   const [schoolName, setSchoolName] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // ✅ NEW: Curriculum configuration state
+  // NEW: Curriculum configuration state
   const [levelConfig, setLevelConfig] = useState(null);
   const [subjectConfig, setSubjectConfig] = useState(null);
   const [autoCalculatedRows, setAutoCalculatedRows] = useState(0);
 
-  // ✅ NEW: Breakdown checking state
+  // Breakdown checking state
   const [existingBreakdowns, setExistingBreakdowns] = useState([]);
   const [checkingBreakdowns, setCheckingBreakdowns] = useState(false);
 
-  // ✅ NEW: Document dependencies map
+  // Document dependencies map
   const documentDependencies = {
     'Schemes of Work': 'Lesson Concept Breakdown',
     'Lesson Plan': 'Lesson Concept Breakdown',
@@ -239,7 +239,7 @@ export default function CreateDocument() {
     }
   }, [formData.weeks, formData.lessonsPerWeek]);
 
-  // ✅ NEW: Check for existing breakdowns when substrand is selected
+  //Check for existing breakdowns when substrand is selected
   useEffect(() => {
     const checkExistingBreakdowns = async () => {
       if (formData.grade && formData.term && formData.strand && formData.substrand) {
@@ -402,7 +402,7 @@ export default function CreateDocument() {
           </div>
         </div>
 
-        {/* ✅ NEW: Quick Start Guide */}
+        {/*Quick Start Guide */}
         <div className="mb-6 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl shadow-sm">
           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2 text-lg">
             <Lightbulb className="w-5 h-5 text-blue-600" />
@@ -612,7 +612,7 @@ export default function CreateDocument() {
                 </div>
               </div>
 
-              {/* ✅ NEW: Breakdown Status Display */}
+              {/*Breakdown Status Display */}
               {formData.substrand && !checkingBreakdowns && (
                 <div className={`p-4 rounded-xl border-2 ${
                   existingBreakdowns.length > 0 
@@ -704,7 +704,7 @@ export default function CreateDocument() {
                 </div>
               )}
 
-              {/* ✅ NEW: Time Field (Optional for Lesson Plans) */}
+              {/* Time Field (Optional for Lesson Plans) */}
               {formData.type === 'Lesson Plan' && (
                 <div className="space-y-2">
                   <Label className="font-semibold text-gray-700">
@@ -781,7 +781,7 @@ export default function CreateDocument() {
             </Select>
           </div>
 
-          {/* ✅ NEW: Prerequisite Information Banner */}
+          {/*Prerequisite Information Banner */}
           {formData.type && documentDependencies[formData.type] && (
             <div className="bg-blue-50 border-l-4 border-blue-600 rounded-r-lg p-4">
               <div className="flex items-start gap-3">

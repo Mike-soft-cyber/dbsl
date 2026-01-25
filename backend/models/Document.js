@@ -38,19 +38,19 @@ const documentSchema = new mongoose.Schema({
     required: true 
   },
 
-  // ✅ NEW: Link to parent document (e.g., Lesson Notes links to Lesson Concept)
+  
   parentDocument: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Document',
     default: null
   },
   
-  // ✅ NEW: Specific lesson details when derived from breakdown
+  
   lessonDetails: {
-    weekNumber: Number,        // e.g., 1, 2, 3
-    lessonNumber: Number,      // e.g., 1 (first lesson of the week)
-    specificConcept: String,   // The exact learning concept from breakdown
-    conceptIndex: Number       // Position in the breakdown (for reference)
+    weekNumber: Number,        
+    lessonNumber: Number,      
+    specificConcept: String,   
+    conceptIndex: Number       
   },
 
   content: { type: String, required: true },
@@ -87,16 +87,16 @@ const documentSchema = new mongoose.Schema({
   generatedBy: { type: String, default: 'AI' }
 }, { timestamps: true });
 
-// Indexes
+
 documentSchema.index({ teacher: 1, createdAt: -1 });
 documentSchema.index({ grade: 1, subject: 1, type: 1 });
 documentSchema.index({ school: 1, createdAt: -1 });
 documentSchema.index({ status: 1, createdAt: -1 });
 documentSchema.index({ type: 1, grade: 1, subject: 1, createdAt: -1 });
 documentSchema.index({ strand: 1, substrand: 1 });
-documentSchema.index({ parentDocument: 1 }); // ✅ NEW: For finding child documents
+documentSchema.index({ parentDocument: 1 }); 
 
-// Text index for search
+
 documentSchema.index({ 
   type: 'text', 
   subject: 'text', 
@@ -104,7 +104,7 @@ documentSchema.index({
   substrand: 'text' 
 });
 
-// ✅ NEW: Virtual for child documents
+
 documentSchema.virtual('childDocuments', {
   ref: 'Document',
   localField: '_id',

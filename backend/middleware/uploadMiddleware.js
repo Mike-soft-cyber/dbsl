@@ -2,13 +2,13 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// ✅ Ensure upload folder exists
+
 const uploadDir = path.join(__dirname, "../uploads/profile-pics");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// ✅ Storage config
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
   },
 });
 
-// ✅ File filter (allow only images)
+
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
   if (allowedTypes.includes(file.mimetype)) {
@@ -30,7 +30,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// ✅ Max file size: 5MB
+
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },

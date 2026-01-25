@@ -1,13 +1,13 @@
 const CBCEntry = require('../models/CbcEntry');
 
-// Create a new CBC entry
+
 exports.createCbcEntry = async (req, res) => {
   try {
     const { 
       grade, learningArea, strand, substrand, 
       slo, learningExperiences, keyInquiryQuestions, 
       resources, assessment, reflection, noOfLessons,
-      // ✅ MAKE SURE THESE ARE HERE:
+      
       ageRange, lessonDuration, lessonsPerWeek,
       coreCompetencies, values, pertinentIssues, 
       linkToOtherSubjects, communityLinkActivities,
@@ -20,7 +20,7 @@ exports.createCbcEntry = async (req, res) => {
       coreCompetencies, values, pertinentIssues
     });
     
-    // Process arrays
+    
     const processedCoreCompetencies = Array.isArray(coreCompetencies) ? coreCompetencies : [];
     const processedValues = Array.isArray(values) ? values : [];
     const processedPertinentIssues = Array.isArray(pertinentIssues) ? pertinentIssues : [];
@@ -39,7 +39,7 @@ exports.createCbcEntry = async (req, res) => {
       assessment, 
       reflection, 
       noOfLessons,
-      // ✅ CRITICAL: These must be here
+      
       ageRange: ageRange || undefined,
       lessonDuration: lessonDuration ? parseInt(lessonDuration) : undefined,
       lessonsPerWeek: lessonsPerWeek ? parseInt(lessonsPerWeek) : undefined,
@@ -53,7 +53,7 @@ exports.createCbcEntry = async (req, res) => {
     
     await entry.save();
     console.log('✅ CBC Entry created successfully:', entry._id);
-    console.log('✅ Saved data:', entry); // ADD THIS LINE TO SEE WHAT'S SAVED
+    console.log('✅ Saved data:', entry); 
     res.status(201).json(entry);
   } catch (error) {
     console.error("❌ Error creating CBC entry:", error);
@@ -61,7 +61,7 @@ exports.createCbcEntry = async (req, res) => {
   }
 };
 
-// Update a CBC entry
+
 exports.updateCbcEntry = async (req, res) => {
   try {
     const {
@@ -80,7 +80,7 @@ exports.updateCbcEntry = async (req, res) => {
       coreCompetencies, values, pertinentIssues
     });
 
-    // 🛠️ Build update object
+    
     const updateData = {
       grade,
       learningArea,
@@ -94,14 +94,14 @@ exports.updateCbcEntry = async (req, res) => {
       assessment,
     };
 
-    // Handle noOfLessons (can be null)
+    
     if (noOfLessons === "" || noOfLessons === null) {
       updateData.noOfLessons = null;
     } else if (noOfLessons !== undefined) {
       updateData.noOfLessons = noOfLessons;
     }
 
-    // ✅ Add curriculum config fields
+    
     if (ageRange !== undefined) updateData.ageRange = ageRange;
     
     if (lessonDuration === "" || lessonDuration === null) {
@@ -116,7 +116,7 @@ exports.updateCbcEntry = async (req, res) => {
       updateData.lessonsPerWeek = parseInt(lessonsPerWeek);
     }
 
-    // ✅ Add KICD fields (arrays)
+    
     if (coreCompetencies !== undefined) updateData.coreCompetencies = coreCompetencies;
     if (values !== undefined) updateData.values = values;
     if (pertinentIssues !== undefined) updateData.pertinentIssues = pertinentIssues;
@@ -149,7 +149,7 @@ exports.updateCbcEntry = async (req, res) => {
   }
 };
 
-// Get all CBC entries (with optional filtering)
+
 exports.getAllCbcEntries = async (req, res) => {
   try {
     const { grade, learningArea } = req.query;
@@ -203,7 +203,7 @@ exports.getSubstrandsByStrand = async (req, res) => {
   }
 };
 
-// Delete a CBC entry
+
 exports.deleteCbcEntry = async (req, res) => {
   try {
     const deleted = await CBCEntry.findByIdAndDelete(req.params.id);
@@ -214,7 +214,7 @@ exports.deleteCbcEntry = async (req, res) => {
   }
 };
 
-// Get a single CBC entry by ID
+
 exports.getCbcEntryById = async (req, res) => {
   try {
     const entry = await CBCEntry.findById(req.params.id);

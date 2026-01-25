@@ -1,4 +1,3 @@
-// src/pages/AuthCallback.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,11 +23,10 @@ export default function AuthCallback() {
           return;
         }
 
-        // ✅ Store the token first
         localStorage.setItem('token', token);
         console.log('✅ Token stored in localStorage');
 
-        // ✅ CRITICAL: Fetch the COMPLETE user data from backend
+        // CRITICAL: Fetch the COMPLETE user data from backend
         console.log('📡 Fetching complete user data from backend...');
         
         const response = await API.get('/teacher/profile', {
@@ -45,15 +43,13 @@ export default function AuthCallback() {
           role: userData.role
         });
 
-        // ✅ Store COMPLETE user data including profilePic
+        // Store COMPLETE user data including profilePic
         localStorage.setItem('userData', JSON.stringify(userData));
         localStorage.setItem('teacherId', userData._id);
         localStorage.setItem('schoolName', userData.schoolName);
 
         console.log('✅ All user data stored in localStorage');
         console.log('📸 Profile pic in localStorage:', userData.profilePic);
-
-        // ✅ Dispatch event to update UI components
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('profilePicUpdated'));
 

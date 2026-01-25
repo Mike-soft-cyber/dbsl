@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Edit2, AlertCircle, Loader2, Plus, Minus, ArrowLeft } from 'lucide-react';
 
 export default function CBCReviewPage() {
-  // Get token from URL (you'll need to pass this as a prop in your actual app)
+  // Get token from URL
   const token = new URLSearchParams(window.location.search).get('token') || 'demo-token';
   
   const [loading, setLoading] = useState(true);

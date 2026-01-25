@@ -1,5 +1,3 @@
-// src/utils/profilePicUtils.js
-
 /**
  * Helper utility to handle both Google OAuth and locally uploaded profile pictures
  */

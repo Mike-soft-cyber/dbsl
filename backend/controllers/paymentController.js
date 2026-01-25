@@ -6,11 +6,11 @@ exports.confirmPayment = async (req, res) => {
   try {
     const { checkoutRequestID, documentData } = req.body;
 
-    // 🔹 Step 1: Confirm payment with Safaricom API (your existing logic)
+    
     const paymentStatus = await checkMpesaPayment(checkoutRequestID);
 
     if (paymentStatus.success && paymentStatus.paid) {
-      // 🔹 Step 2: Generate the document using AI
+      
       let aiResponse;
       switch (documentData.type) {
         case "Concept Breakdown":
@@ -32,10 +32,10 @@ exports.confirmPayment = async (req, res) => {
           throw new Error("Unknown document type");
       }
 
-      // 🔹 Step 3: Save AI-generated doc to DB / file storage
+      
       const fileUrl = await saveDocumentToStorage(aiResponse, documentData);
 
-      // 🔹 Step 4: Send back download URL to frontend
+      
       return res.json({
         success: true,
         paid: true,
@@ -57,7 +57,7 @@ const paymentCallback = async (req, res) => {
   const checkoutRequestID = result.CheckoutRequestID;
 
   if (result.ResultCode === 0) {
-    // Success
+    
     const metadata = result.CallbackMetadata.Item;
     const receipt = metadata.find(i => i.Name === 'MpesaReceiptNumber')?.Value;
     const amount = metadata.find(i => i.Name === 'Amount')?.Value;
@@ -73,7 +73,7 @@ const paymentCallback = async (req, res) => {
       { new: true }
     );
 
-    // Mark Document as Paid
+    
     await Document.findByIdAndUpdate(payment.document, {
       isPaid: true,
       status: 'completed'
@@ -81,7 +81,7 @@ const paymentCallback = async (req, res) => {
 
     console.log('✅ Payment successful:', receipt);
   } else {
-    // Failed payment
+    
     await Payment.findOneAndUpdate(
       { checkoutRequestID },
       { status: 'failed' }

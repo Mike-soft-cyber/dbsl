@@ -55,7 +55,7 @@ export default function Signup() {
 
       toast.success(message || "Account created successfully!");
       
-      // ✅ Redirect to appropriate dashboard immediately
+      // Redirect to appropriate dashboard immediately
       if (user.role === 'Admin') {
         navigate('/adminPages');
       } else {
@@ -71,7 +71,7 @@ export default function Signup() {
   }
 };
 
-    // ✅ ADD: Google Signup Handler
+    // Google Signup Handler
     const handleGoogleSignup = () => {
         const backendUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
         window.location.href = `${backendUrl}/api/user/google`;
@@ -96,7 +96,7 @@ export default function Signup() {
                 </CardHeader>
                 
                 <CardContent>
-                    {/* ✅ ADD: Google Signup Button */}
+                    {/* Google Signup Button */}
                     <Button
                         type="button"
                         onClick={handleGoogleSignup}
@@ -106,7 +106,7 @@ export default function Signup() {
                         <span className="ml-2 font-semibold">Sign up with Google</span>
                     </Button>
 
-                    {/* ✅ ADD: Divider */}
+                    {/* Divider */}
                     <div className="relative my-6">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-gray-200"></div>

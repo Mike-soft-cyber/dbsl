@@ -7,17 +7,17 @@ const { extractCBCData } = require('../utils/pdfExtractor');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-/**
- * Process incoming email with PDF attachment
- * This is called by SendGrid Inbound Parse webhook
- */
+
+
+
+
 exports.processIncomingEmail = async (req, res) => {
   try {
     console.log('📧 Received email with attachments');
     
     const { from, subject, text, attachments } = req.body;
     
-    // Check for PDF attachment
+    
     const pdfAttachment = attachments?.find(att => 
       att.type === 'application/pdf' || att.filename?.endsWith('.pdf')
     );
@@ -30,13 +30,13 @@ exports.processIncomingEmail = async (req, res) => {
     
     console.log(`📄 Processing PDF: ${pdfAttachment.filename}`);
     
-    // Parse PDF
+    
     const pdfBuffer = Buffer.from(pdfAttachment.content, 'base64');
     const pdfData = await PDFParser(pdfBuffer);
     
     console.log(`✅ PDF parsed (${pdfData.text.length} characters)`);
     
-    // Extract CBC data
+    
     const extractedData = extractCBCData(pdfData.text);
     
     console.log('🔍 Extracted data:', {
@@ -45,10 +45,10 @@ exports.processIncomingEmail = async (req, res) => {
       strand: extractedData.strand
     });
     
-    // Generate confirmation token
+    
     const confirmationToken = crypto.randomBytes(32).toString('hex');
     
-    // Save as pending entry
+    
     const pendingEntry = await PendingCBCEntry.create({
       extractedData,
       sourceEmail: from,
@@ -60,7 +60,7 @@ exports.processIncomingEmail = async (req, res) => {
     
     console.log(`✅ Pending entry created: ${pendingEntry._id}`);
     
-    // Send confirmation email
+    
     await sendConfirmationEmail(from, pendingEntry, extractedData);
     
     res.status(200).json({ 
@@ -81,9 +81,9 @@ exports.processIncomingEmail = async (req, res) => {
   }
 };
 
-/**
- * Handle confirmation/approval of extracted data
- */
+
+
+
 exports.confirmExtractedData = async (req, res) => {
   try {
     const { token } = req.params;
@@ -102,7 +102,7 @@ exports.confirmExtractedData = async (req, res) => {
       });
     }
     
-    // Check if expired
+    
     if (pendingEntry.expiresAt < new Date()) {
       return res.status(400).json({ 
         error: 'Confirmation link has expired' 
@@ -110,7 +110,7 @@ exports.confirmExtractedData = async (req, res) => {
     }
     
     if (action === 'approve') {
-      // Use original extracted data
+      
       const cbcEntry = await CBCEntry.create(pendingEntry.extractedData);
       
       pendingEntry.status = 'approved';
@@ -119,7 +119,7 @@ exports.confirmExtractedData = async (req, res) => {
       
       console.log(`✅ CBC Entry approved and saved: ${cbcEntry._id}`);
       
-      // Send success email
+      
       await sendSuccessEmail(pendingEntry.sourceEmail, cbcEntry);
       
       res.json({
@@ -129,7 +129,7 @@ exports.confirmExtractedData = async (req, res) => {
       });
       
     } else if (action === 'edit') {
-      // User provided edited data
+      
       const cbcEntry = await CBCEntry.create({
         ...pendingEntry.extractedData,
         ...editedData
@@ -175,9 +175,9 @@ exports.confirmExtractedData = async (req, res) => {
   }
 };
 
-/**
- * Get pending entry for review
- */
+
+
+
 exports.getPendingEntry = async (req, res) => {
   try {
     const { token } = req.params;
@@ -205,9 +205,9 @@ exports.getPendingEntry = async (req, res) => {
   }
 };
 
-// ============================================
-// Email Templates
-// ============================================
+
+
+
 
 async function sendConfirmationEmail(toEmail, pendingEntry, extractedData) {
   const confirmationUrl = `${process.env.FRONTEND_URL}/confirm-cbc/${pendingEntry.confirmationToken}`;

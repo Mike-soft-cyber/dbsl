@@ -3,7 +3,6 @@ const nodemailer = require('nodemailer');
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const crypto = require('crypto');
-const CBCEntry = require('../models/CbcEntry');
 const PendingCbcEntry = require('../models/PendingCbcEntry');
 
 class EmailPdfProcessor {
@@ -122,12 +121,12 @@ class EmailPdfProcessor {
       try {
         console.log(`\n📄 Processing: ${pdf.filename}`);
         
-        // Extract ALL substrands from this PDF
+        
         const allSubstrands = await this.extractAllSubstrandsFromPdf(pdf.content);
         
         console.log(`✅ Extracted ${allSubstrands.length} substrand(s) from ${pdf.filename}`);
 
-        // Save each substrand as a separate pending entry
+        
         for (let i = 0; i < allSubstrands.length; i++) {
           const substrandData = allSubstrands[i];
           const reviewToken = crypto.randomBytes(32).toString('hex');
@@ -159,11 +158,11 @@ class EmailPdfProcessor {
       }
     }
 
-    // Send review email
+    
     await this.sendReplyEmail(senderEmail, subject, 'review', { results, errors });
   }
 
-  // Helper function to add delay between API calls
+  
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -172,13 +171,13 @@ class EmailPdfProcessor {
     console.log('   🤖 Calling Claude AI to extract ALL substrands...');
     const base64Pdf = pdfBuffer.toString('base64');
 
-    // Extract ALL substrands in a SINGLE API call
+    
     console.log('   📊 Extracting all substrands in one comprehensive request...');
     
     try {
       const extractionMessage = await this.anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000, // Increased for comprehensive extraction
+        max_tokens: 8000, 
         messages: [
           {
             role: 'user',
@@ -244,14 +243,14 @@ CRITICAL INSTRUCTIONS:
     } catch (error) {
       console.error(`   ❌ Error during batch extraction:`, error.message);
       
-      // Fallback: If batch extraction fails, try chunked approach
+      
       console.log(`   🔄 Falling back to chunked extraction (extracting 3 substrands at a time)...`);
       return await this.extractSubstrandsInChunks(base64Pdf);
     }
   }
 
   async extractSubstrandsInChunks(base64Pdf) {
-    // First, get the list of all substrands
+    
     const structureMessage = await this.anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
@@ -293,7 +292,7 @@ Only return the JSON array, no markdown.`
     console.log(`   ⏱️  Extracting in batches of 3 to manage rate limits...`);
 
     const allExtractedData = [];
-    const BATCH_SIZE = 3; // Extract 3 substrands per request
+    const BATCH_SIZE = 3; 
 
     for (let i = 0; i < substrandsList.length; i += BATCH_SIZE) {
       const batch = substrandsList.slice(i, i + BATCH_SIZE);
@@ -362,16 +361,16 @@ IMPORTANT: Extract data ONLY for these ${batch.length} substrand(s). Return ONLY
         allExtractedData.push(...batchData);
         console.log(`      ✅ Successfully extracted ${batchData.length} substrand(s) from batch ${batchNum}`);
 
-        // Wait 2 minutes between batches to ensure token quota resets
+        
         if (i + BATCH_SIZE < substrandsList.length) {
           console.log(`      ⏳ Waiting 2 minutes before next batch to respect rate limits...`);
-          await this.delay(120000); // 120 seconds = 2 minutes
+          await this.delay(120000); 
         }
 
       } catch (error) {
         console.error(`      ❌ Error extracting batch ${batchNum}:`, error.message);
         
-        // If rate limit, wait 2 minutes
+        
         if (error.message && error.message.includes('rate_limit_error')) {
           console.log(`      ⏳ Rate limit hit - waiting 2 minutes...`);
           await this.delay(120000);

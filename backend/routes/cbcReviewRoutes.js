@@ -3,7 +3,7 @@ const router = express.Router();
 const CBCEntry = require('../models/CbcEntry');
 const PendingCbcEntry = require('../models/PendingCbcEntry');
 
-// Get pending entry by review token
+
 router.get('/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -35,13 +35,13 @@ router.get('/:token', async (req, res) => {
   }
 });
 
-// Approve and save to main database
+
 router.post('/:token/approve', async (req, res) => {
   try {
     const { token } = req.params;
     const editedData = req.body;
 
-    // Find pending entry
+    
     const pendingEntry = await PendingCbcEntry.findOne({
       reviewToken: token,
       status: 'pending'
@@ -55,7 +55,7 @@ router.post('/:token/approve', async (req, res) => {
 
     console.log('✅ Approving CBC entry:', editedData.grade, editedData.learningArea);
 
-    // Create new CBC entry with edited data
+    
     const cbcEntry = new CBCEntry({
       grade: editedData.grade,
       learningArea: editedData.learningArea,
@@ -79,14 +79,14 @@ router.post('/:token/approve', async (req, res) => {
 
     await cbcEntry.save();
 
-    // Update pending entry status
+    
     pendingEntry.status = 'approved';
     await pendingEntry.save();
 
     console.log('✅ CBC entry saved to database:', cbcEntry._id);
 
-    // Send confirmation email (optional)
-    // You can call emailService here to notify the sender
+    
+    
 
     res.json({
       success: true,
@@ -103,7 +103,7 @@ router.post('/:token/approve', async (req, res) => {
   }
 });
 
-// Reject entry
+
 router.post('/:token/reject', async (req, res) => {
   try {
     const { token } = req.params;
@@ -138,7 +138,7 @@ router.post('/:token/reject', async (req, res) => {
   }
 });
 
-// Get all pending entries (for admin dashboard)
+
 router.get('/pending/all', async (req, res) => {
   try {
     const pendingEntries = await PendingCbcEntry.find({
@@ -159,7 +159,7 @@ router.get('/pending/all', async (req, res) => {
   }
 });
 
-// Bulk approve multiple entries
+
 router.post('/bulk/approve', async (req, res) => {
   try {
     const { tokens } = req.body;

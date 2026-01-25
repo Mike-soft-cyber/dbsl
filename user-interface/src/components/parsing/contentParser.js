@@ -1,4 +1,3 @@
-// Unified ContentParser for both frontend and backend
 class ContentParser {
   static parse(content, documentType, cbcEntry = null) {
     if (!content) {
@@ -8,7 +7,6 @@ class ContentParser {
     
     console.log('[ContentParser] Parsing', documentType, '- Content length:', content.length);
     
-    // Force table parsing for these document types
     if (documentType === 'Lesson Concept Breakdown') {
       const tableData = this.parseLessonConceptTable(content);
       if (tableData && tableData.rows && tableData.rows.length > 0) {
@@ -27,7 +25,6 @@ class ContentParser {
       console.warn('[ContentParser] âš ï¸ Failed to parse Schemes table, falling back to markdown');
     }
     
-    // Check for any table-like content
     const tableIndicators = (content.match(/\|.*\|/g) || []);
     if (tableIndicators.length > 3) {
       console.log('[ContentParser] Detected', tableIndicators.length, 'table rows, attempting generic parse');
@@ -38,7 +35,6 @@ class ContentParser {
       }
     }
     
-    // Default to markdown rendering
     console.log('[ContentParser] Using markdown rendering');
     return { type: 'markdown', data: content };
   }
@@ -60,7 +56,6 @@ class ContentParser {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // Detect table header - MORE LENIENT
     if (!foundTableStart && line.includes('|')) {
       const lowerLine = line.toLowerCase();
       if ((lowerLine.includes('term') || lowerLine.includes('week')) && 
@@ -87,15 +82,12 @@ class ContentParser {
       
       console.log('[Parser] Row', rowNumber, '- Raw cells:', cells.length, '-', cells.map(c => c.substring(0, 15)));
       
-      // âœ… FIX: Accept 4 or 5 columns
       if (cells.length >= 4 && cells.length <= 5) {
         let term, week, strand, substrand, concept;
         
         if (cells.length === 5) {
-          // Standard format
           [term, week, strand, substrand, concept] = cells;
         } else if (cells.length === 4) {
-          // Missing term column
           [week, strand, substrand, concept] = cells;
           term = 'Term 1'; // Default
         }
@@ -108,7 +100,6 @@ class ContentParser {
                               !concept.toLowerCase().includes('fallback');
         
         if (isValidWeek && isValidConcept) {
-          // Ensure we have 5 columns
           const row = [term || 'Term 1', week, strand || '', substrand || '', concept];
           tableData.rows.push(row);
           console.log('[Parser] âœ… Added row', rowNumber, '- Week:', week);
@@ -121,7 +112,6 @@ class ContentParser {
       }
     }
     
-    // Safety limit
     if (tableData.rows.length >= 100) {
       console.log('[Parser] âš ï¸ Reached 100 row limit, stopping');
       break;
@@ -153,7 +143,6 @@ class ContentParser {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Detect table start
       if (!foundTableStart && this.isSchemeHeaderLine(line)) {
         foundTableStart = true;
         console.log('[Parser] âœ… Found schemes table header at line', i);
@@ -162,32 +151,26 @@ class ContentParser {
       
       if (!foundTableStart) continue;
       
-      // Skip separator rows
       if (line.match(/^\|[\s\-:]+\|$/)) {
         continue;
       }
-      
-      // Process data rows
+
       if (line.includes('|')) {
-        // Split and clean cells
         const cells = line
           .split('|')
           .map(cell => cell.trim());
-        
-        // Remove empty cells at start/end only
+
         if (cells[0] === '') cells.shift();
         if (cells[cells.length - 1] === '') cells.pop();
         
         console.log('[Parser] Row cells:', cells.length, '- First:', cells[0]?.substring(0, 15));
-        
-        // âœ… STRICT: Only accept rows with exactly 10 columns
+
         if (cells.length === 10) {
           const week = cells[0];
           const lesson = cells[1];
           const slo = cells[4];
           const reflection = cells[9];
           
-          // Validate it's a real data row
           const isValidRow = 
             week && (week.toLowerCase().includes('week') || /^w?\d+$/i.test(week)) &&
             lesson && (lesson.toLowerCase().includes('lesson') || /^\d+$/.test(lesson)) &&
@@ -205,7 +188,6 @@ class ContentParser {
         } else {
           console.log('[Parser] âŒ Wrong column count:', cells.length, '(need exactly 10)');
           
-          // Log what's missing
           if (cells.length < 10) {
             console.log('[Parser] Missing columns:', 10 - cells.length);
             console.log('[Parser] Cells:', cells.map((c, i) => `${i}:${c.substring(0, 20)}`).join(' | '));
@@ -243,7 +225,6 @@ class ContentParser {
           continue;
         }
         
-        // Skip metadata lines
         if (this.isMetadataLine(trimmed)) {
           continue;
         }
@@ -253,11 +234,9 @@ class ContentParser {
           console.log('[Parser] Found header with', cells.length, 'columns:', headerRow);
           foundTable = true;
         } else if (foundTable && headerRow && cells.length >= 3) {
-          // Pad or trim to match header
           while (cells.length < headerRow.length) cells.push('');
           if (cells.length > headerRow.length) cells = cells.slice(0, headerRow.length);
-          
-          // FIXED: Accept rows with any content length > 5
+
           if (cells.some(cell => cell.length > 5)) {
             dataRows.push(cells);
           }
@@ -279,7 +258,6 @@ class ContentParser {
 
   // Helper methods
   static isMetadataLine(line) {
-    // FIXED: More specific patterns to avoid false positives
     const metadataPatterns = [
       /^SCHOOL:\s/i,
       /^FACILITATOR:\s/i,
@@ -296,13 +274,11 @@ class ContentParser {
   static isTableHeaderLine(line) {
   const lessonConceptHeaders = ['Term', 'Week', 'Strand', 'Sub-strand', 'Learning Concept'];
   const schemeHeaders = ['WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 'SPECIFIC LEARNING OUTCOMES', 'LEARNING EXPERIENCES', 'KEY INQUIRY QUESTION', 'LEARNING RESOURCES', 'ASSESSMENT', 'REFLECTION'];
-  
-  // Check for lesson concept table
+ 
   const lcMatchCount = lessonConceptHeaders.filter(header => 
     line.toLowerCase().includes(header.toLowerCase())
   ).length;
-  
-  // Check for schemes table
+
   const schemeMatchCount = schemeHeaders.filter(header =>
     line.toLowerCase().includes(header.toLowerCase())
   ).length;
@@ -311,7 +287,6 @@ class ContentParser {
 }
 
  static isSchemeHeaderLine(line) {
-    // More precise header detection
     const requiredHeaders = ['WEEK', 'LESSON', 'STRAND', 'SUB-STRAND', 'SPECIFIC LEARNING OUTCOMES'];
     const lineUpper = line.toUpperCase();
     
@@ -335,7 +310,6 @@ class ContentParser {
     /^fallback document/i
   ];
   
-  // More lenient validation for fallback content
   return concept.length > 5 && 
          !invalidPatterns.some(pattern => pattern.test(concept));
 }
@@ -343,7 +317,6 @@ class ContentParser {
 static isValidSchemeRow(week, slo) {
   if (!week || !slo) return false;
   
-  // More flexible validation
   const validWeek = /week/i.test(week) || 
                     /^\d+$/.test(week) || 
                     /^W\d+/i.test(week) ||
@@ -360,12 +333,10 @@ static isValidSchemeRow(week, slo) {
   static isValidSchemeRow(week, slo) {
     if (!week || !slo) return false;
     
-    // FIXED: More flexible week validation
     const validWeek = /week/i.test(week) || 
                       /^\d+$/.test(week) || 
                       /^W\d+/i.test(week);
     
-    // FIXED: Reduced SLO length requirement
     const validSLO = slo.length > 15 && 
                      !slo.includes('SPECIFIC LEARNING OUTCOMES') &&
                      !slo.includes('SLO');
@@ -374,7 +345,6 @@ static isValidSchemeRow(week, slo) {
   }
 }
 
-// Export for both CommonJS (backend) and ES6 (frontend)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ContentParser;
 }

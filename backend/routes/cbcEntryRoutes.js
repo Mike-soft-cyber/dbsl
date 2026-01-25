@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/cbcEntryController');
 
-//app.use('/api/cbc)
+
 router.post('/', controller.createCbcEntry);
 router.get('/', controller.getAllCbcEntries);
 router.get('/grades', controller.getGrades);

@@ -11,7 +11,6 @@ const GenerateLessonPlanButton = ({ document }) => {
   const [concepts, setConcepts] = useState([]);
   const [extractionError, setExtractionError] = useState(null);
 
-   // ✅ ADD DEBUG LOGS HERE - right after state declarations
   console.log('🚀 Debug GenerateLessonPlanButton:');
   console.log('Document ID:', document?._id);
   console.log('Document type:', document?.type);
@@ -29,7 +28,6 @@ const GenerateLessonPlanButton = ({ document }) => {
     // Use the ContentParser to parse the table
     const parsed = ContentParser.parse(document.content, 'Lesson Concept Breakdown');
     
-    // ✅ MOVE THE DEBUG LOGS HERE - after parsed is defined
     console.log('[useEffect] Parsed table structure:');
     console.log('Headers:', parsed.data?.headers);
     console.log('First row:', parsed.data?.rows?.[0]);
@@ -154,7 +152,7 @@ const GenerateLessonPlanButton = ({ document }) => {
   const generateLessonPlan = async () => {
     if (generating) return;
     
-    // ✅ Validate before proceeding
+    // Validate before proceeding
     if (!document?._id) {
       setError('Document ID is missing');
       return;
@@ -215,7 +213,7 @@ const GenerateLessonPlanButton = ({ document }) => {
         throw new Error(data.error || data.message || `HTTP ${response.status}: Failed to generate lesson plan`);
       }
 
-      // ✅ Better success handling
+      // Better success handling
       if (data.success) {
         const planId = data.document?._id || data.documentId;
         if (planId) {
@@ -244,7 +242,7 @@ const GenerateLessonPlanButton = ({ document }) => {
 
   const selectedConcept = concepts[selectedLesson - 1];
 
-  // ✅ Disabled conditions
+  // Disabled conditions
   const isButtonDisabled = 
     generating || 
     concepts.length === 0 || 

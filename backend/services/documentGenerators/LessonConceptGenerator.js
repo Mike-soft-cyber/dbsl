@@ -1,4 +1,4 @@
-// LessonConceptGenerator.js - FIXED to match client requirements
+
 
 const BaseDocumentGenerator = require('./BaseDocumentGenerator');
 
@@ -13,11 +13,11 @@ class FixedLessonConceptGenerator extends BaseDocumentGenerator {
       weeks, lessonsPerWeek, lessonDuration, ageRange 
     } = requestData;
     
-    // ✅ CRITICAL FIX: Use weeks and lessonsPerWeek from curriculum config (not cbcEntry.noOfLessons)
+    
     const safeWeeks = weeks || 10;
     const safeLessonsPerWeek = lessonsPerWeek || 5;
     
-    // ✅ CRITICAL FIX: Calculate total rows as per client requirement (WEEKS × LESSONS_PER_WEEK)
+    
     const totalRows = safeWeeks * safeLessonsPerWeek;
     
     const sloList = cbcEntry?.slo || [];
@@ -143,9 +143,9 @@ OUTPUT STRUCTURE:
 Begin generating the ${totalRows}-row table now:`;
   }
 
-  /**
-   * ✅ Generate distribution strategy explanation
-   */
+  
+
+
   generateDistributionStrategy(sloList, weeks, lessonsPerWeek) {
     const totalRows = weeks * lessonsPerWeek;
     const sloCount = sloList.length;

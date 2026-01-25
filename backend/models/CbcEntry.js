@@ -15,14 +15,14 @@ const cbcEntrySchema = new mongoose.Schema(
     strand: { type: String, required: true },
     substrand: { type: String, required: true },
 
-    // ✅ These MUST be here:
+    
     ageRange: { type: String },
     lessonDuration: { type: Number },
     lessonsPerWeek: { type: Number },
     
-    slo: [{ type: String }], //Specific Learning Outcomes
-    learningExperiences: [{ type: String }], // Learning Experiences
-    keyInquiryQuestions: [{ type: String }], // Key Inquiry Questions
+    slo: [{ type: String }], 
+    learningExperiences: [{ type: String }], 
+    keyInquiryQuestions: [{ type: String }], 
     resources: [{ type: String }],
     assessment: [assessmentSchema],
     reflection: [{ type: String }],
@@ -32,7 +32,7 @@ const cbcEntrySchema = new mongoose.Schema(
       set: v => (v === "" || v === null ? null : v) 
     },
 
-    // ✅ These MUST be here WITHOUT enum restrictions:
+    
     coreCompetencies: [{ type: String }],
     values: [{ type: String }],
     pertinentIssues: [{ type: String }],
@@ -43,7 +43,7 @@ const cbcEntrySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Indexes
+
 cbcEntrySchema.index({ grade: 1, learningArea: 1, strand: 1, substrand: 1 });
 cbcEntrySchema.index({ grade: 1, learningArea: 1 });
 cbcEntrySchema.index({ learningArea: 1 });

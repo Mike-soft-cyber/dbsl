@@ -1,8 +1,8 @@
-// fixCounts.js
+
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Your MongoDB connection string
+
 const MONGO_URI = process.env.MONGO_URI;
 
 const User = require('./models/User');
@@ -15,16 +15,16 @@ async function fixUserCounts() {
     
     const userId = '6893accb0fabc860ae51a568';
     
-    // Count documents created by this user
+    
     const documentsCreatedCount = await Document.countDocuments({ 
       teacher: userId 
     });
     
-    // Count downloads from downloadedDocuments array
+    
     const user = await User.findById(userId);
     const downloadsCount = user.downloadedDocuments ? user.downloadedDocuments.length : 0;
     
-    // Update the user document
+    
     await User.findByIdAndUpdate(userId, {
       documentsCreated: documentsCreatedCount,
       downloads: downloadsCount
@@ -44,5 +44,5 @@ async function fixUserCounts() {
   }
 }
 
-// Run the function
+
 fixUserCounts();

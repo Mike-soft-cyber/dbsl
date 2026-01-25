@@ -1,13 +1,10 @@
-// BaseDocumentGenerator.js - COMPLETE FIXED VERSION
-const { OpenAI } = require("openai");
-
 class BaseDocumentGenerator {
   constructor(type, config = {}) {
     this.type = type;
     this.maxRetries = 3;
     this.timeoutMs = 180000;
     
-    // Default to OpenAI if nothing specified
+    
     this.aiProvider = config.aiProvider || process.env.AI_PROVIDER || 'openai';
     
     console.log(`[${this.type}] Using AI Provider: ${this.aiProvider}`);
@@ -42,7 +39,7 @@ class BaseDocumentGenerator {
         apiKey: process.env.ANTHROPIC_API_KEY
       });
       
-      // CLAUDE 4.X MODELS - Use these!
+      
       const claude4Models = [
         'claude-4-haiku-20241022',
         'claude-4-sonnet-20241022',
@@ -50,12 +47,12 @@ class BaseDocumentGenerator {
         'claude-4-opus-20241022'
       ];
       
-      // Try the one from env, or use Claude 4 Haiku (cheapest/fastest)
+      
       const envModel = process.env.ANTHROPIC_MODEL;
       if (envModel && claude4Models.includes(envModel)) {
         this.model = envModel;
       } else {
-        this.model = 'claude-4-haiku-20241022'; // Default to Claude 4 Haiku
+        this.model = 'claude-4-haiku-20241022'; 
         console.log(`[${this.type}] Using Claude 4 model: ${this.model}`);
       }
       break;
@@ -67,11 +64,11 @@ class BaseDocumentGenerator {
         break;
 
       case 'ollama':
-        // For local Ollama
+        
         const { OpenAI: OllamaOpenAI } = require("openai");
         this.client = new OllamaOpenAI({
           baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
-          apiKey: "ollama" // Not needed for Ollama
+          apiKey: "ollama" 
         });
         this.model = process.env.OLLAMA_MODEL || "llama2";
         break;
@@ -214,7 +211,7 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
 
   async callAI(prompt) {
     try {
-      // Check API key based on provider
+      
       this.validateAPIKey();
 
       const controller = new AbortController();
@@ -255,7 +252,7 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
               temperature: 0.3,
               system: this.getSystemMessage()
             });
-            // Format to match OpenAI response structure
+            
             response = {
               choices: [{
                 message: {
@@ -308,7 +305,7 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
       'anthropic': 'ANTHROPIC_API_KEY',
       'google': 'GOOGLE_API_KEY',
       'azure': 'AZURE_OPENAI_KEY',
-      'ollama': null // No API key needed
+      'ollama': null 
     };
 
     const envVar = envVars[this.aiProvider];
@@ -356,7 +353,7 @@ Due to a technical issue (${error.message}), the full AI-generated content is un
     throw new Error(`AI service error: ${error.toString()}`);
   }
 
-  // Abstract method - must be implemented by subclasses
+  
   createPrompt(requestData, cbcEntry) {
     throw new Error('createPrompt must be implemented in subclass');
   }

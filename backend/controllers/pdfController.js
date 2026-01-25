@@ -5,7 +5,7 @@ const path = require('path');
 const Document = require('../models/Document');
 const axios = require('axios');
 
-// Escape HTML special characters
+
 function escapeHtml(text) {
   const map = {
     '&': '&amp;',

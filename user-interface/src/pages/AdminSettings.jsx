@@ -43,7 +43,6 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // userData from localStorage
   const userData = useMemo(() => {
     const stored = localStorage.getItem("userData");
     return stored ? JSON.parse(stored) : null;
@@ -96,7 +95,6 @@ export default function AdminSettings() {
                 setLogoPreviewUrl(`${SERVER_BASE_URL}/uploads/school-logos/${school.schoolLogo}`);
               }
 
-              // Also fetch streams
               setStreams(school.streams || []);
             }
           } catch (schoolError) {
@@ -195,11 +193,9 @@ export default function AdminSettings() {
         setProfile((prev) => ({ ...prev, profilePic: newPic }));
         setProfilePreviewUrl(`${SERVER_BASE_URL}/uploads/profile-pics/${newPic}`);
 
-        // Update localStorage for Navbar
         const updatedUserData = { ...userData, profilePic: newPic };
         localStorage.setItem("userData", JSON.stringify(updatedUserData));
 
-        // Trigger Navbar refresh
         window.dispatchEvent(
           new CustomEvent("profilePicUpdated", {
             detail: { profilePic: newPic },
@@ -247,7 +243,6 @@ export default function AdminSettings() {
         setSchoolData((prev) => ({ ...prev, schoolLogo: newLogo }));
         setLogoPreviewUrl(`${SERVER_BASE_URL}/uploads/school-logos/${newLogo}`);
 
-        // Trigger AdminPages to refresh
         window.dispatchEvent(
           new CustomEvent("schoolLogoUpdated", {
             detail: { 
@@ -265,7 +260,6 @@ export default function AdminSettings() {
     }
   };
 
-  // Update profile info
   const updateProfile = async () => {
     try {
       setSaving(true);
@@ -281,7 +275,6 @@ export default function AdminSettings() {
 
       toast.success("Profile updated successfully!");
 
-      // Update localStorage
       const updatedUserData = { ...userData, firstName, lastName };
       localStorage.setItem("userData", JSON.stringify(updatedUserData));
 
@@ -294,7 +287,6 @@ export default function AdminSettings() {
     }
   };
 
-  // Update school information
   const updateSchoolInfo = async () => {
     try {
       setSaving(true);
@@ -310,7 +302,6 @@ export default function AdminSettings() {
       if (response.data.success) {
         toast.success("School information updated successfully!");
 
-        // Trigger AdminPages to refresh
         window.dispatchEvent(
           new CustomEvent("schoolLogoUpdated", {
             detail: { 

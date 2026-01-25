@@ -1,6 +1,6 @@
 const Activity = require('../models/Activity');
 
-// Create new teacher registration activity
+
 exports.newTeacherActivity = async (teacherData) => {
     try {
         if (!teacherData.firstName) {
@@ -24,12 +24,11 @@ exports.newTeacherActivity = async (teacherData) => {
     }
 };
 
-// Create document creation activity
+
 exports.docCreatedActivity = async (activityData) => {
     try {
         const { teacherName, teacherId, grade, stream, learningArea, docType, schoolCode, documentId } = activityData;
         
-        // Validate required fields
         if (!teacherName || !grade || !stream || !learningArea || !docType) {
             throw new Error('Missing required activity data');
         }
@@ -56,7 +55,7 @@ exports.docCreatedActivity = async (activityData) => {
     }
 };
 
-// Create document download activity
+
 exports.docDownloadedActivity = async (activityData) => {
     try {
         const { teacherName, teacherId, docType, schoolCode, documentId } = activityData;
@@ -84,7 +83,7 @@ exports.docDownloadedActivity = async (activityData) => {
     }
 };
 
-// Get all activities with filtering options
+
 exports.getAllActivities = async (req, res) => {
     try {
         const { 
@@ -95,28 +94,28 @@ exports.getAllActivities = async (req, res) => {
             userId 
         } = req.query;
 
-        // Build query object
+        
         const query = {};
         if (schoolCode) query.schoolCode = schoolCode;
         if (type) query.type = type;
         if (userId) query.userId = userId;
 
-        // Calculate pagination
+        
         const skip = (parseInt(page) - 1) * parseInt(limit);
-        const limitNum = Math.min(parseInt(limit), 50); // Max 50 items per request
+        const limitNum = Math.min(parseInt(limit), 50); 
 
-        // Fetch activities with pagination
+        
         const activities = await Activity.find(query)
-            .populate('userId', 'firstName lastName email') // Populate user details if needed
+            .populate('userId', 'firstName lastName email')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limitNum)
-            .lean(); // Use lean() for better performance
+            .lean(); 
 
-        // Get total count for pagination
+        
         const total = await Activity.countDocuments(query);
 
-        // Format response
+        
         const formattedActivities = activities.map(activity => ({
             _id: activity._id,
             type: activity.type,
@@ -151,7 +150,7 @@ exports.getAllActivities = async (req, res) => {
     }
 };
 
-// Get recent activities for a specific school
+
 exports.getRecentActivities = async (req, res) => {
     try {
         const { schoolCode } = req.params;
@@ -196,7 +195,7 @@ exports.getRecentActivities = async (req, res) => {
     }
 };
 
-// Helper function to calculate time ago
+
 function getTimeAgo(date) {
     const now = new Date();
     const diffInMs = now - new Date(date);
@@ -220,7 +219,7 @@ exports.teacherAssignedClassActivity = async (activityData) => {
             throw new Error('Missing required class assignment data');
         }
 
-        // Extract class information for the message
+        
         const classDescriptions = assignedClasses.map(cls => 
             `${cls.grade} ${cls.stream} - ${cls.learningArea}`
         ).join(', ');
@@ -246,7 +245,7 @@ exports.teacherAssignedClassActivity = async (activityData) => {
     }
 };
 
-// Create teacher class removal activity
+
 exports.teacherRemovedClassActivity = async (activityData) => {
     try {
         const { teacherName, teacherId, removedClass, schoolCode } = activityData;
@@ -276,7 +275,7 @@ exports.teacherRemovedClassActivity = async (activityData) => {
     }
 };
 
-// Enhanced document download activity with class information
+
 exports.docDownloadedActivity = async (activityData) => {
     try {
         const { teacherName, teacherId, docType, schoolCode, documentId, grade, subject, learningArea } = activityData;
@@ -285,7 +284,7 @@ exports.docDownloadedActivity = async (activityData) => {
             throw new Error('Missing required download activity data');
         }
 
-        // Build message with class information if available
+        
         let message = `${teacherName} downloaded a ${docType}`;
         if (grade && subject) {
             message += ` for ${grade} - ${subject}`;
@@ -315,7 +314,7 @@ exports.docDownloadedActivity = async (activityData) => {
     }
 };
 
-// Teacher login activity
+
 exports.teacherLoginActivity = async (activityData) => {
     try {
         const { teacherName, teacherId, schoolCode } = activityData;

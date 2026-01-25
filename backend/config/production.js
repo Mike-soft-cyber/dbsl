@@ -1,5 +1,5 @@
 module.exports = {
-  // Database
+  
   mongodb: {
     uri: process.env.MONGODB_URI,
     options: {
@@ -13,7 +13,7 @@ module.exports = {
     }
   },
 
-  // Redis (optional)
+  
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || 6379,
@@ -23,24 +23,24 @@ module.exports = {
     enableOfflineQueue: false
   },
 
-  // Rate limiting
+  
   rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // requests per window
+    windowMs: 15 * 60 * 1000, 
+    max: 100, 
     skipSuccessfulRequests: false,
     skipFailedRequests: false
   },
 
-  // OpenAI
+  
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
     model: 'gpt-4',
     maxTokens: 4000,
     temperature: 0.3,
-    timeout: 120000 // 2 minutes
+    timeout: 120000 
   },
 
-  // Server
+  
   server: {
     port: process.env.PORT || 5000,
     host: '0.0.0.0',
@@ -52,7 +52,7 @@ module.exports = {
     }
   },
 
-  // Security
+  
   security: {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiry: '7d',
@@ -60,31 +60,31 @@ module.exports = {
     sessionSecret: process.env.SESSION_SECRET
   },
 
-  // File uploads
+  
   uploads: {
-    maxFileSize: 10 * 1024 * 1024, // 10MB
+    maxFileSize: 10 * 1024 * 1024, 
     allowedMimeTypes: ['image/jpeg', 'image/png', 'application/pdf'],
-    storageType: process.env.STORAGE_TYPE || 'local', // 'local' or 's3'
+    storageType: process.env.STORAGE_TYPE || 'local', 
     localPath: './uploads'
   },
 
-  // Logging
+  
   logging: {
     level: process.env.LOG_LEVEL || 'info',
     file: true,
     console: process.env.NODE_ENV !== 'production'
   },
 
-  // Cache
+  
   cache: {
-    timeout: 5 * 60 * 1000, // 5 minutes
+    timeout: 5 * 60 * 1000, 
     maxSize: 1000,
-    cleanupInterval: 60 * 1000 // 1 minute
+    cleanupInterval: 60 * 1000 
   },
 
-  // Queue (Bull)
+  
   queue: {
-    concurrency: 2, // Process 2 jobs at a time
+    concurrency: 2, 
     maxAttempts: 3,
     backoffDelay: 5000,
     removeOnComplete: 100,

@@ -18,7 +18,7 @@ router.post('/callback', (req, res) => {
     const callback = data.Body.stkCallback;
     console.log("✅ Received stkCallback:", callback);
 
-    // You can save to DB or process further
+    
 
     res.status(200).send("Callback received");
   } catch (error) {

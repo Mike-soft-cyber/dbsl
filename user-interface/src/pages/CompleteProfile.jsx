@@ -1,4 +1,3 @@
-// src/pages/CompleteProfile.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/ui/input';

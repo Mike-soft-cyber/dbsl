@@ -8,15 +8,15 @@ class ExercisesGenerator extends BaseDocumentGenerator {
   createPrompt(requestData, cbcEntry) {
     const { school, grade, learningArea, strand, substrand, term } = requestData;
     
-    // Extract all relevant CBC data
+    
     const sloList = cbcEntry?.slo || [];
     const learningExperiences = cbcEntry?.learningExperiences || [];
     const keyInquiryQuestions = cbcEntry?.keyInquiryQuestions || [];
     const assessmentCriteria = cbcEntry?.assessment || [];
-    const resources = cbcEntry?.resources || []; // CRITICAL FIX: Added missing variable
+    const resources = cbcEntry?.resources || []; 
     const noOfLessons = cbcEntry?.noOfLessons || 'Not specified';
 
-    // Extract assessment skills for comprehensive testing
+    
     const assessmentSkills = assessmentCriteria.map(item => item.skill).filter(Boolean);
 
     return `Generate comprehensive Exercises fully aligned with CBC framework data:

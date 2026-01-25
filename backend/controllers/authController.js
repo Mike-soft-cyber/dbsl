@@ -1,4 +1,4 @@
-// controllers/authController.js - Simplified
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -9,7 +9,7 @@ const signup = async (req, res) => {
 
   const { firstName, lastName, phone, role, schoolName, schoolCode, email, password } = req.body;
 
-  // Basic validation
+  
   if (!firstName || !lastName) {
     return res.status(400).json({ message: "First name and Last name are required" });
   }
@@ -19,17 +19,14 @@ const signup = async (req, res) => {
   }
 
   try {
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user (auto-verified)
     const newUser = await User.create({
       firstName,
       lastName,
@@ -39,12 +36,11 @@ const signup = async (req, res) => {
       schoolCode,
       email,
       password: hashedPassword,
-      isVerified: true // Auto-verify
+      isVerified: true 
     });
 
     console.log('✅ User created:', newUser._id);
 
-    // Log activity (optional)
     try {
       await newTeacherActivity({
         _id: newUser._id,
@@ -55,21 +51,18 @@ const signup = async (req, res) => {
       console.log('✅ Teacher registration activity logged');
     } catch (activityError) {
       console.error('⚠️ Failed to log teacher activity:', activityError.message);
-      // Continue anyway
     }
 
-    // Generate JWT token immediately
     const token = jwt.sign(
       { id: newUser._id, email: newUser.email, role: newUser.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Return success with token
     res.status(201).json({ 
       success: true,
       message: "Account created successfully!",
-      token: token, // Return token immediately
+      token: token,
       user: {
         _id: newUser._id,
         email: newUser.email,
@@ -87,7 +80,6 @@ const signup = async (req, res) => {
   } catch (err) {
     console.error('💥 SIGNUP ERROR:', err);
     
-    // Handle specific errors
     if (err.name === 'ValidationError') {
       return res.status(400).json({ 
         message: "Validation error", 
@@ -107,38 +99,36 @@ const signup = async (req, res) => {
   }
 };
 
-// Login - Remove verification check
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     console.log('🔐 Login attempt for:', email);
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       console.log('❌ User not found:', email);
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Check password
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.log('❌ Invalid password for:', email);
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // ✅ REMOVED: Email verification check
-    // User can login immediately after signup
+    
+    
 
-    // Generate JWT token
+    
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Return complete user object
+    
     const userResponse = {
       _id: user._id,
       firstName: user.firstName,

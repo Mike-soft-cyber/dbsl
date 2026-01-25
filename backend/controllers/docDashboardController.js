@@ -5,7 +5,7 @@ exports.getAllTeacherPurchases = async (req, res) => {
   try {
     console.log('[DocDashboard] Fetching documents for school...');
     
-    // Get the school code from query params or from user's school
+    
     const { schoolCode } = req.query;
     
     if (!schoolCode) {
@@ -16,7 +16,7 @@ exports.getAllTeacherPurchases = async (req, res) => {
     
     console.log(`[DocDashboard] Fetching documents for school: ${schoolCode}`);
     
-    // First, get all teachers in this school
+    
     const teachersInSchool = await User.find({ 
       schoolCode: schoolCode,
       role: { $in: ['Teacher', 'Admin'] }
@@ -30,7 +30,7 @@ exports.getAllTeacherPurchases = async (req, res) => {
       return res.status(200).json([]);
     }
     
-    // Fetch documents created by teachers in this school
+    
     const documents = await Document.find({
       teacher: { $in: teacherIds }
     })
@@ -41,14 +41,14 @@ exports.getAllTeacherPurchases = async (req, res) => {
 
     console.log(`[DocDashboard] Found ${documents.length} documents in school ${schoolCode}`);
 
-    // Map documents to the format expected by frontend
+    
     const result = documents.map(doc => {
-      // Handle case where teacher might not exist (deleted user)
+      
       const teacherName = doc.teacher 
         ? `${doc.teacher.firstName} ${doc.teacher.lastName}`
         : 'Unknown Teacher';
 
-      // Get data from document or cbcEntry
+      
       const grade = doc.grade || doc.cbcEntry?.grade || 'N/A';
       const learningArea = doc.subject || doc.cbcEntry?.learningArea || 'N/A';
       const strand = doc.strand || doc.cbcEntry?.strand || 'N/A';
@@ -66,7 +66,7 @@ exports.getAllTeacherPurchases = async (req, res) => {
         status: doc.status || 'completed',
         content: doc.content || '',
         term: doc.term || 'N/A',
-        schoolCode: doc.teacher?.schoolCode || schoolCode // Include school code
+        schoolCode: doc.teacher?.schoolCode || schoolCode 
       };
     });
 
@@ -84,12 +84,12 @@ exports.getAllTeacherPurchases = async (req, res) => {
 
 exports.deleteDocumentPurchase = async (req, res) => {
   const { id } = req.params;
-  const { schoolCode } = req.query; // Optional: verify document belongs to school
+  const { schoolCode } = req.query; 
 
   try {
     console.log(`[DocDashboard] Deleting document: ${id} for school: ${schoolCode || 'not specified'}`);
     
-    // Optional: Verify the document belongs to the school
+    
     if (schoolCode) {
       const document = await Document.findById(id).populate('teacher', 'schoolCode');
       if (document && document.teacher && document.teacher.schoolCode !== schoolCode) {

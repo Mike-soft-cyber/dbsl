@@ -41,7 +41,7 @@ const pendingCbcEntrySchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
-    expires: 604800 // 7 days
+    expires: 604800 
   }
 });
 

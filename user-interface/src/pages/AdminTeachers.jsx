@@ -82,9 +82,7 @@ export default function AdminTeachers() {
             teachersRes.data.forEach(t => roleMap[t._id] = t.role === "Admin");
             setRoleStates(roleMap);
 
-            // Try different endpoints for streams
             try {
-                // First try the school-config streams endpoint
                 const streamsRes = await API.get(`/school-config/${schoolCode}/streams`);
                 console.log("Streams response:", streamsRes.data);
                 if (streamsRes.data && streamsRes.data.streams) {
@@ -100,7 +98,6 @@ export default function AdminTeachers() {
                     if (schoolConfigRes.data && schoolConfigRes.data.school && schoolConfigRes.data.school.streams) {
                         setStreams(schoolConfigRes.data.school.streams || []);
                     } else {
-                        // If no streams found, use default streams
                         setStreams(['Stream A', 'Stream B', 'Stream C']);
                     }
                 } catch (configError) {
@@ -109,7 +106,6 @@ export default function AdminTeachers() {
                 }
             }
 
-            // Fetch grades and CBC entries
             const [gradesRes, cbcRes] = await Promise.all([
                 API.get('/documents/grades'),
                 API.get('/cbc')

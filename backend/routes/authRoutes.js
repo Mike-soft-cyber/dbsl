@@ -4,11 +4,11 @@ const user = require('../controllers/authController');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
 
-//app.use('/api/user')
+
 router.post('/register', user.signup);
 router.post('/login', user.login);
 
-// Google OAuth routes
+
 router.get('/google', 
     passport.authenticate('google', { 
         scope: ['email', 'profile'],
@@ -36,7 +36,7 @@ router.get('/google/callback',
       console.log('ProfilePic starts with http?', user.profilePic?.startsWith('http'));
       console.log('============================');
       
-      // Check if profile has REAL values (not placeholders)
+      
       const isPlaceholderSchool = user.schoolName === 'Pending Setup' || user.schoolCode === 'PENDING';
       const isPlaceholderPhone = user.phone === '0000000000' || user.phone === '';
       const hasRealSchoolInfo = user.schoolName && user.schoolCode && 
@@ -46,7 +46,7 @@ router.get('/google/callback',
       console.log('Is placeholder phone?', isPlaceholderPhone);
       console.log('Has real school info?', hasRealSchoolInfo);
       
-      // Also check the needsCompleteProfile flag if you added it
+      
       const needsCompletion = user.needsCompleteProfile === true || 
                              !hasRealSchoolInfo;
       
