@@ -4,15 +4,20 @@ import ContentParser from '../parsing/contentParser';
 import TableView from './TableView';
 import MarkdownView from './MarkdownView';
 import { extractHeaderAndBody, enhanceContentWithMarkdown, expandSLOs } from '../../utils/contentFormatter';
+import { cleanCurriculumNumbers } from '../../utils/curriculumFormatter';
 
 const DocumentContent = ({ content, documentType, cbcEntry, documentId, learningArea, strand, substrand }) => {
+  // Clean strand and substrand for display
+  const cleanStrand = useMemo(() => cleanCurriculumNumbers(strand), [strand]);
+  const cleanSubstrand = useMemo(() => cleanCurriculumNumbers(substrand), [substrand]);
+
   // Memoize the parsed content to prevent unnecessary re-parsing
   const parsedContent = useMemo(() => {
     if (!content) return { type: 'empty', data: null };
     
     let parsed = ContentParser.parse(content, documentType, cbcEntry);
     
-    //If table parsing fails but content has tables, force table detection
+    // If table parsing fails but content has tables, force table detection
     if (parsed.type !== 'table' && content.includes('|') && 
         (documentType === 'Lesson Concept Breakdown' || documentType === 'Schemes of Work')) {
       console.log('[TEMP FIX] Forcing table detection for', documentType);
@@ -63,28 +68,28 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
   }, [content]);
 
   // If table parsing succeeded, show the table
- if (parsedContent.type === 'table' && parsedContent.data) {
-  return (
-    <>
-      <div className="mb-6">
-        <div className="flex items-center space-x-2 text-sm mb-2">
-          <FileText className="h-4 w-4 text-black" />
-          <span className="text-black">Structured Educational Content</span>
+  if (parsedContent.type === 'table' && parsedContent.data) {
+    return (
+      <>
+        <div className="mb-6">
+          <div className="flex items-center space-x-2 text-sm mb-2">
+            <FileText className="h-4 w-4 text-black" />
+            <span className="text-black">Structured Educational Content</span>
+          </div>
+          <p className="text-black text-sm">
+            This content has been automatically formatted into a structured table format 
+            based on the Kenyan Competency Based Curriculum guidelines.
+          </p>
         </div>
-        <p className="text-black text-sm">
-          This content has been automatically formatted into a structured table format 
-          based on the Kenyan Competency Based Curriculum guidelines.
-        </p>
-      </div>
-      <TableView 
-        data={parsedContent.data} 
-        strand={strand}
-        substrand={substrand}
-        cbcEntry={cbcEntry}
-      />
-    </>
-  );
-}
+        <TableView 
+          data={parsedContent.data} 
+          strand={cleanStrand}
+          substrand={cleanSubstrand}
+          cbcEntry={cbcEntry}
+        />
+      </>
+    );
+  }
 
   // Fallback to markdown processing
   return (
@@ -99,7 +104,7 @@ const DocumentContent = ({ content, documentType, cbcEntry, documentId, learning
             {headerPairs.map(([key, value], idx) => (
               <div key={idx} className="flex flex-col space-y-1">
                 <span className="text-sm font-bold uppercase tracking-wide text-black">{key}</span>
-                <span className="text-black">{value}</span>
+                <span className="text-black">{cleanCurriculumNumbers(value)}</span>
               </div>
             ))}
           </div>

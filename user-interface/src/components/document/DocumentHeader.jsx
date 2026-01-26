@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, FileText, BookOpen, PenTool, Target } from 'lucide-react';
+import { cleanCurriculumNumbers } from '../../utils/curriculumFormatter';
 
 const DocumentHeader = ({ document, onPrint, onDownload }) => {
   const getDocumentIcon = (type) => {
@@ -35,13 +36,19 @@ const DocumentHeader = ({ document, onPrint, onDownload }) => {
             </div>
             <div className="flex flex-wrap gap-2 text-sm text-black">
               {document?.school && (
-                <span className="px-2 py-1 border border-gray-300 rounded font-bold">{document.school}</span>
+                <span className="px-2 py-1 border border-gray-300 rounded font-bold">
+                  {document.school}
+                </span>
               )}
               {document?.strand && (
-                <span className="px-2 py-1 border border-gray-300 rounded font-bold">{document.strand}</span>
+                <span className="px-2 py-1 border border-gray-300 rounded font-bold">
+                  {cleanCurriculumNumbers(document.strand)}
+                </span>
               )}
               {document?.substrand && (
-                <span className="px-2 py-1 border border-gray-300 rounded font-bold">{document.substrand}</span>
+                <span className="px-2 py-1 border border-gray-300 rounded font-bold">
+                  {cleanCurriculumNumbers(document.substrand)}
+                </span>
               )}
             </div>
           </div>

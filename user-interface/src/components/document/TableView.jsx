@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { cleanCurriculumNumbers, cleanTableData } from '../../utils/curriculumFormatter';
 
 const TableView = ({ data, strand, substrand, cbcEntry }) => {
-   if (!data || !data.headers || !data.rows || data.rows.length === 0) {
+  // Clean the data at the start
+  const cleanedData = useMemo(() => cleanTableData(data), [data]);
+  const cleanedStrand = useMemo(() => cleanCurriculumNumbers(strand), [strand]);
+  const cleanedSubstrand = useMemo(() => cleanCurriculumNumbers(substrand), [substrand]);
+
+  if (!cleanedData || !cleanedData.headers || !cleanedData.rows || cleanedData.rows.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         No table data available
@@ -9,16 +15,16 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
     );
   }
 
-  let fixedData = { ...data };
+  let fixedData = { ...cleanedData };
   
-  const isSchemesOfWork = data.headers.some(h => 
+  const isSchemesOfWork = fixedData.headers.some(h => 
     h.toUpperCase().includes('SPECIFIC LEARNING OUTCOMES') ||
     h.toUpperCase().includes('KEY INQUIRY QUESTION') ||
     h.toUpperCase().includes('LEARNING EXPERIENCES')
   );
   
   if (isSchemesOfWork) {
-    console.warn('[TableView] ⚠️ Schemes of Work detected with', data.headers.length, 'columns');
+    console.warn('[TableView] ⚠️ Schemes of Work detected with', fixedData.headers.length, 'columns');
     
     const correctHeaders = [
       'WEEK', 'LESSON', 'STRAND', 'SUB-STRAND',
@@ -32,7 +38,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
     if (sloList.length === 1 && sloList[0].includes('b)')) {
       console.log('[TableView] ⚠️ Detected combined SLOs, splitting...');
       const combined = sloList[0];
-      // Split by lowercase letter followed by closing parenthesis
       sloList = combined
         .split(/(?=[a-z]\))/)
         .map(slo => slo.replace(/^[a-z]\)\s*/, '').trim())
@@ -80,7 +85,7 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
     }
     
     const dataMap = new Map();
-    data.headers.forEach((h, i) => {
+    fixedData.headers.forEach((h, i) => {
       const normalized = h.toUpperCase();
       if (normalized.includes('LEARNING EXPERIENCES')) dataMap.set('LEARNING_EXP', i);
       else if (normalized.includes('KEY INQUIRY') || normalized.includes('KIQ')) dataMap.set('KIQ', i);
@@ -94,12 +99,12 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       else if (normalized.includes('REFLECTION')) dataMap.set('REFLECTION', i);
     });
     
-    let defaultStrand = strand || 'NATURAL ENVIRONMENT';
-    let defaultSubstrand = substrand || 'Soil';
+    let defaultStrand = cleanedStrand || 'NATURAL ENVIRONMENT';
+    let defaultSubstrand = cleanedSubstrand || 'Soil';
     
-    if (!strand && dataMap.has('STRAND')) {
-      for (let i = 0; i < Math.min(5, data.rows.length); i++) {
-        const row = data.rows[i];
+    if (!cleanedStrand && dataMap.has('STRAND')) {
+      for (let i = 0; i < Math.min(5, fixedData.rows.length); i++) {
+        const row = fixedData.rows[i];
         const value = row[dataMap.get('STRAND')];
         if (value && value.length > 3 && !value.includes('What') && !value.includes('Learners')) {
           defaultStrand = value;
@@ -108,9 +113,9 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       }
     }
     
-    if (!substrand && dataMap.has('SUBSTRAND')) {
-      for (let i = 0; i < Math.min(5, data.rows.length); i++) {
-        const row = data.rows[i];
+    if (!cleanedSubstrand && dataMap.has('SUBSTRAND')) {
+      for (let i = 0; i < Math.min(5, fixedData.rows.length); i++) {
+        const row = fixedData.rows[i];
         const value = row[dataMap.get('SUBSTRAND')];
         if (value && value.length > 2 && !value.includes('What') && !value.includes('Learners')) {
           defaultSubstrand = value;
@@ -126,7 +131,7 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
         return '(a) Learners will achieve the learning outcomes for this lesson';
       }
       
-      const lessonsPerSLO = Math.ceil(data.rows.length / sloList.length);
+      const lessonsPerSLO = Math.ceil(fixedData.rows.length / sloList.length);
       const sloIndex = Math.floor(lessonIndex / lessonsPerSLO);
       const actualIndex = Math.min(sloIndex, sloList.length - 1);
       const letter = String.fromCharCode(97 + actualIndex);
@@ -134,13 +139,12 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       return `(${letter}) ${sloList[actualIndex]}`;
     };
     
-    //get appropriate learning experience
     const getLearningExperience = (lessonIndex) => {
       if (learningExperiences.length === 0) {
         return 'Learners engage in learning activities';
       }
       
-      const rotationIndex = Math.floor(lessonIndex / 2); // Change every 2 lessons
+      const rotationIndex = Math.floor(lessonIndex / 2);
       return learningExperiences[rotationIndex % learningExperiences.length];
     };
     
@@ -175,25 +179,24 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
       return reflectionTemplates[lessonIndex % reflectionTemplates.length];
     };
     
-    // Reconstruct rows with all 10 columns in correct order
     fixedData.headers = correctHeaders;
-    fixedData.rows = data.rows.map((row, rowIndex) => {
-      const weekNum = Math.floor(rowIndex / 5) + 1; // Adjust based on lessons per week
+    fixedData.rows = fixedData.rows.map((row, rowIndex) => {
+      const weekNum = Math.floor(rowIndex / 5) + 1;
       const lessonNum = rowIndex + 1;
       
       const sloText = getSLOForLesson(rowIndex);
       
       const newRow = [
-        `Week ${weekNum}`,                                          
-        `Lesson ${lessonNum}`,                                       
-        defaultStrand,                                               
-        defaultSubstrand,                                            
-        sloText,                                                     
-        getLearningExperience(rowIndex),                             
-        getKeyInquiryQuestion(rowIndex),                             
-        row[dataMap.get('RESOURCES')] || 'Realia, charts',         
-        getAssessment(rowIndex),                                     
-        getReflection(rowIndex, sloText)                             
+        `Week ${weekNum}`,
+        `Lesson ${lessonNum}`,
+        defaultStrand,
+        defaultSubstrand,
+        sloText,
+        getLearningExperience(rowIndex),
+        getKeyInquiryQuestion(rowIndex),
+        row[dataMap.get('RESOURCES')] || 'Realia, charts',
+        getAssessment(rowIndex),
+        getReflection(rowIndex, sloText)
       ];
       
       return newRow;
@@ -204,54 +207,40 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
   }
 
   else {
-
-    if (data.headers.some(h => h.toLowerCase().includes('learning concept'))) {
-    console.log('[TableView] ✅ Lesson Concept Breakdown detected');
-    console.log('[TableView] Current headers:', data.headers);
-    console.log('[TableView] Current columns:', data.headers.length);
-    
-    const standardHeaders = ['TERM', 'WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT'];
-    
-    // Only fix if headers don't match
-    if (data.headers.length !== 5 || !arraysEqual(data.headers.map(h => h.toUpperCase()), standardHeaders)) {
-      console.log('[TableView] ⚠️ Fixing columns for Lesson Concept Breakdown');
+    if (fixedData.headers.some(h => h.toLowerCase().includes('learning concept'))) {
+      console.log('[TableView] ✅ Lesson Concept Breakdown detected');
       
-      fixedData.headers = standardHeaders;
+      const standardHeaders = ['TERM', 'WEEK', 'STRAND', 'SUB-STRAND', 'LEARNING CONCEPT'];
       
-      fixedData.rows = data.rows.map(row => {
-        const newRow = [...row];
+      if (fixedData.headers.length !== 5 || !arraysEqual(fixedData.headers.map(h => h.toUpperCase()), standardHeaders)) {
+        console.log('[TableView] ⚠️ Fixing columns for Lesson Concept Breakdown');
         
-        // If row has fewer than 5 columns, pad with empty strings
-        while (newRow.length < 5) {
-          newRow.push('');
-        }
+        fixedData.headers = standardHeaders;
         
-        // If first column is not a term, add default term
-        if (newRow[0] && !newRow[0].toLowerCase().includes('term')) {
-          newRow.unshift('Term 1'); // Add term at beginning
-        }
-        
-        // Ensure exactly 5 columns
-        if (newRow.length > 5) {
-          newRow.length = 5;
-        }
-        
-        return newRow;
-      });
-      
-      console.log('[TableView] ✅ Fixed to 5 columns:', fixedData.headers);
-      console.log('[TableView] Sample row:', fixedData.rows[0]);
+        fixedData.rows = fixedData.rows.map(row => {
+          const newRow = [...row];
+          
+          while (newRow.length < 5) newRow.push('');
+          
+          if (newRow[0] && !newRow[0].toLowerCase().includes('term')) {
+            newRow.unshift('Term 1');
+          }
+          
+          if (newRow.length > 5) newRow.length = 5;
+          
+          return newRow;
+        });
+      }
     }
-  }
   }
 
   function arraysEqual(a, b) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
   }
-  return true;
-}
 
   console.log('[TableView] Final headers:', fixedData.headers.length, fixedData.headers);
 
@@ -305,7 +294,6 @@ const TableView = ({ data, strand, substrand, cbcEntry }) => {
         </table>
       </div>
       
-      {/* Table summary */}
       <div className="mt-4 text-sm text-gray-600 no-print">
         <p>
           Showing {fixedData.rows.length} {fixedData.rows.length === 1 ? 'entry' : 'entries'} 
@@ -322,12 +310,8 @@ const getColumnWidth = (header, index) => {
   const headerLower = header.toLowerCase();
   
   if (headerLower.includes('term') && !headerLower.includes('determine')) {
-    return '80px'; // Term column width
+    return '80px';
   } else if (headerLower.includes('week')) {
-    return '70px';
-  }
-  
-  if (headerLower.includes('week')) {
     return '70px';
   } else if (headerLower.includes('lesson') && !headerLower.includes('learning')) {
     return '70px';
@@ -347,8 +331,6 @@ const getColumnWidth = (header, index) => {
     return '150px';
   } else if (headerLower.includes('reflection')) {
     return '180px';
-  } else if (headerLower.includes('term')) {
-    return '80px';
   } else if (headerLower.includes('learning concept')) {
     return '300px';
   }
