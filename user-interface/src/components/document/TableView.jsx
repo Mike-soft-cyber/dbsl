@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { cleanCurriculumNumbers, cleanTableData } from '../../utils/curriculumFormatter';
+import { cleanCurriculumNumbers, cleanTableData} from '../../utils/curriculumFormatter';
 
 const TableView = ({ data, strand, substrand, cbcEntry }) => {
   // Clean the data at the start
