@@ -1875,7 +1875,7 @@ exports.generateLessonPlanFromBreakdown = async (req, res) => {
     
     // 5. Generate Lesson Plan for this specific concept
     const requestData = {
-      teacher: req.user?._id,
+      teacher: breakdown.teacher,  // ✅ FIXED: Use breakdown's teacher instead of req.user
       teacherName: teacherName || req.user?.firstName + ' ' + (req.user?.lastName || '') || 'Teacher',
       school: school || breakdown.school || 'Educational Institution',
       grade: breakdown.grade,
